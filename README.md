@@ -41,7 +41,7 @@ for i = 1 to cost
 plaintext = aes_decrypt(ciphertext, dk)
 ```
 
-This program uses `PBKDF2_SHA256` as the delay function for encryption and decryption, which takes about 1s per call on recent CPU generations.
+This program uses `PBKDF2_SHA256` with 10 million iterations as the delay function for encryption and decryption, which takes about 1s per call on recent CPU generations.
 
 You may have noticed that this solution is silly because encryption takes the same time as decryption. In theory, encryption can be done quickly. For example, the authors of the RSA explained how to implement time-lock puzzles in [this paper](https://people.csail.mit.edu/rivest/pubs/RSW96.pdf) decades ago.
 
