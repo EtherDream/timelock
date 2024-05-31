@@ -61,6 +61,8 @@ FireFox is not optimized for PBKDF2（~50% slower)
 
 ## When to use
 
-* Post a CPU race on SNS, the first person to unlock it will get a coupon link. It is more interesting to compete on hardware performance than on luck.
+* CPU performance benchmarks.
+
+* Post a CPU race on SNS, the first person to unlock it will get a coupon link. It is more interesting to compete on hardware than on luck.
 
 * Temporarily lock an account, such as hiding the wallet private key in a time capsule. Let Moore's Law take over your account, not your spirit.
