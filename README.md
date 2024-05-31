@@ -51,7 +51,7 @@ Of course, these algorithms can be ported to the browser, but obviously it will 
 
 Since browsers support PBKDF2 natively and are optimized for it, using this API reduces the performance gap between browsers and native programs. Although this is not friendly to the sender, it makes no difference to the receiver.
 
-However, fast encryption can still be tried. We can pre-compute `<key, dk>` records for common costs, and take a record directly from the pool when we use it. For hourly costs, this is feasible.
+However, fast encryption can still be tried. We can pre-compute `<key, dk>` records for common costs using idle devices, and take a record directly from the pool when we use it. For hourly or even daily costs, this is feasible.
 
 
 ## Known issues
