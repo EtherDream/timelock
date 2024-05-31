@@ -43,7 +43,9 @@ plaintext = aes_decrypt(ciphertext, dk)
 
 This program uses `PBKDF2_SHA256` with 10 million iterations as the delay function for encryption and decryption, which takes about 1s per call on recent CPU generations.
 
-You may have noticed that this solution is silly because encryption takes the same time as decryption. In theory, encryption can be done quickly. For example, the authors of the RSA explained how to implement time-lock puzzles in [this paper](https://people.csail.mit.edu/rivest/pubs/RSW96.pdf) decades ago.
+Why call PBKDF2 multiple times instead of just once with a larger iteration parameter? Because PBKDF2 in the browser does not support callbacks and cannot get progress, so large iterations are split into multiple serial calls to avoid this problem. This makes no difference in crypto strength.
+
+You may have noticed that **this solution is silly because encryption takes the same time as decryption**. In theory, encryption can be done quickly. For example, the authors of the RSA explained how to implement time-lock puzzles in [this paper](https://people.csail.mit.edu/rivest/pubs/RSW96.pdf) decades ago.
 
 Of course, these algorithms can be ported to the browser, but obviously it will not run as efficiently as native programs because a lot of performance will be lost in the JavaScript/WebAssembly VM. For impatient receivers, there is no need to decrypt the message in the browser, it can be done earlier using a native program.
 
@@ -59,6 +61,6 @@ FireFox is not optimized for PBKDF2（~50% slower)
 
 ## When to use
 
-* CPU race. The first person to unlock it will be rewarded with a coupon.
+* Post a CPU race on SNS, the first person to unlock it will get the coupon link.
 
-* Temporarily lock an account, e.g. game account, wallet private key, etc. Let Moore's Law take over your account, not your spirit.
+* Temporarily lock an account, such as hiding the wallet private key in a time capsule. Let Moore's Law take over your account, not your spirit.
