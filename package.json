@@ -1,0 +1,18 @@
+{
+  "name": "timelock",
+  "version": "1.0.0",
+  "description": "time-lock puzzles for browsers",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "tsc -w",
+    "build": "tsc"
+  },
+  "keywords": [
+    "timelock", "crypto", "pbkdf2"
+  ],
+  "author": "EtherDream",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
