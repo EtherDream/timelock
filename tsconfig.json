@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "outDir": "www",
+    "target": "ESNext",
+    "lib": ["ESNext", "DOM"],
+    "strict": true
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}
