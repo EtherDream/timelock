@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "outDir": "www",
+    "outDir": "docs",
     "target": "ESNext",
     "lib": ["ESNext", "DOM"],
     "strict": true
