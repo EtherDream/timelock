@@ -1,24 +1,44 @@
-# Timelock
+# Timelock Online
 
-The sender encrypts the message and the receiver cannot decrypt it immediately, but must wait for a specified time before seeing the message.
+[中文文档](README-zh.md)
+
+A sender encrypts the message and the no one cannot decrypt it immediately, but must wait for a specified time before seeing the message. Send information into the future.
 
 Data and algorithms are public, no servers are required.
 
 ## Demo
 
-https://etherdream.github.io/timelock/
+### Encryption
+
+https://etherdream.github.io/timelock/encrypt.html
+
+`Cost` is the decryption cost, i.e. how many times the receiver needs to repeat SHA256 hash function to complete the decryption. The unit is MHash. (1 MHash = 1,000,000 Hash)
+
+You can select the CPU model of the decryption device on the right side for evaluating the decryption time.
+
+`CPUs`, `GPUs` are the number of CPU and GPU threads used to speed up encryption.
+
+Before encryption, you can click the `Benchmark` to evaluate the hardware performance. It is best to keep the laptop on AC power, otherwise its performance will be limited.
+
+### Decryption
+
+https://etherdream.github.io/timelock/decrypt.html
+
+Decryption uses only a single CPU thread.
+
+> It is recommended to use Safari for encryption (WebCrypto supports multi-threading) and Chrome for decryption (WebCrypto is the best optimized).
 
 ## Test
 
-https://etherdream.github.io/timelock/#version=0.0.1&cost=30&cipher=wYta9UpqaR67wS_ROa4kZeELXnyPwR-nr5MPsqD1yOaQ7ZhuQiHt88Pskw&seeds=pD0WMcnIvbWMlyNoI9DgVnN1TYAVdflsR5_6D6de1UCwNA4GqXrUcA&salt=nRMSoM9DrlA&check=HR55lQ
+[Decryption Test](https://etherdream.github.io/timelock/decrypt.html#version=1.0.0&cost=600&cipher=vcATGmAwxIbxqe9ZRPIknvHTb-lyb2AreBgfmxmvCKK-pkmL-HuZ0VPFHQ&node.name=CPU+%28WebCrypto%29&node.iter=37500000&node.seedNum=8&node.seedLen=4&node.seeds=DcJkt5I2gUZqG1gQb_055GXA06sYQJ0L7ur0PESLiEo&node.salt=lFQ06ZnbXEIkl2X2&check=3t7MgQ)
 
-Click the "Decrypt" button and the message will be decrypted after ~30s.
+Click the `Decrypt` button and the message will be decrypted after ~30s.
 
 ## How it works
 
 ### Encryption
 
-![encryption](https://github.com/EtherDream/timelock/assets/1072787/d143de8b-0469-4816-b25d-cb1fdfa884c9)
+![encryption](docs/images/encryption.webp)
 
 ```lua
 -- parallel --
@@ -30,28 +50,29 @@ end
 key = hash[1]
 
 for i = 2 to P
-  seed[i] ^= key
-  key ^= hash[i]
+  encrypted_seed[i] = encrypt(seed[i], key)
+  key = encrypt(hash[i], key)
 end
 
 ciphertext = encrypt(plaintext, key)
 ```
 
-`P` is the parallel number (4 in the illustration). Each seed can be slow-hashed in parallel, e.g. using GPUs or even distributed devices. Finally all seeds (except the first one) will be encrypted, with each key depending on its previous hash.
+`P` is the thread number (4 in the illustration). Each thread computes the `slow_hash` of the seed in parallel, after all threads are done, all seeds (except the first one) are encrypted, each key depends on its previous hash value, and the message is encrypted with last key.
 
-Share `ciphertext` and `seed[]`.
+Share `ciphertext`, `seed1`, and `encrypted_seed[]`.
 
 
 ### Decryption
 
-![decryption](https://github.com/EtherDream/timelock/assets/1072787/5f21e749-437a-44ed-9ed6-c79de615500e)
+![encryption](docs/images/decryption.webp)
 
 ```lua
 key = slow_hash(seed[1])
 
 for i = 2 to P
-  hash = slow_hash(seed[i] ^ key)
-  key ^= hash
+  seed = decrypt(encrypted_seed[i], key)
+  hash = slow_hash(seed)
+  key = decrypt(hash, key)
 end
 
 plaintext = decrypt(ciphertext, key)
@@ -63,38 +84,89 @@ Since each key depends on its previous result, decryption cannot be accelerated 
 
 For time-lock puzzles, using slow hash is a bad strategy because encryption takes the same amount of work as decryption, although encryption can be accelerated by parallelization.
 
-In theory, encryption takes much less work than decryption. For example, authors of the RSA explained how to implement time-lock puzzles in [this paper](https://people.csail.mit.edu/rivest/pubs/RSW96.pdf) decades ago. Of course, these algorithms can be ported to the browser, but obviously it will not run as efficiently as native programs because a lot of performance will be lost in the JavaScript/WebAssembly VM. For impatient receivers, there is no need to decrypt the message in the browser, it can be done earlier using a native program.
+A good time-lock algorithm should take much less work to encrypt than to decrypt. For example, authors of the RSA explained how to implement time-lock puzzles in [this paper](https://people.csail.mit.edu/rivest/pubs/RSW96.pdf) decades ago. Of course, these algorithms can be ported to the browser, but obviously it will not run as efficiently as native programs because a lot of performance will be lost in the JavaScript/WebAssembly VM. **For impatient receivers, there is no need to decrypt the message in the browser, it can be done earlier using a native program.**
 
 However browsers natively support slow hash algorithms (`PBKDF2`) and have optimized them, using this API reduces the performance gap between browsers and native programs. Although this is not friendly to the sender, it makes no difference to the receiver.
 
-## About slow hash
-
-Unfortunately WebCrypto PBKDF2 does not provide a way to get progress, pause and resume, and has a maximum limit on iterations (2<sup>32</sup>). To avoid these problems, we split a single large iteration into multiple small calls.
+<details>
+<summary>What's PBKDF2?</summary>
+PBKDF2 is a hash function wrapper that can specify a cost, similar to the following logic:
 
 ```lua
-function slow_hash(dk)
-  for i = 1 to cost_pre_thread
-    id = thread_id * cost_pre_thread + i
-    dk = pbkdf2_sha256(dk, salt ^ id, 1e7)
+function pbkdf2(fn, password, salt, iter)
+  hash = fn(password, salt)
+
+  for i = 2 to iter
+    hash = fn(hash, ...)
   end
-  return dk
+  return hash
 end
 ```
 
-This program uses `PBKDF2_SHA256` with 10 million iterations as the delay function, which takes about 1s per call on recent CPU generations.
+`pbkdf2_sha256` uses `hmac_sha256` as the hash function.
+</details>
 
-We mix the call count (`id` above) into the salt to make pre-computation more difficult.
+## About slow hash
+
+Unfortunately, WebCrypto PBKDF2 does not provide a way to get progress, pause and resume, and the PBKDF2 itself has a limit on iterations (2<sup>32</sup>). To avoid these problems, we split a single large iteration into multiple small calls.
+
+```lua
+function slow_hash(seed, iter)
+  let loop = iter / small_iter
+  let hash = seed
+
+  for i = 1 to loop
+    hash = pbkdf2_sha256(hash, salt, small_iter)
+  end
+  return hash
+end
+```
+
+## About security
+
+Unlike common hash algorithms, the `slow_hash` algorithm here is very difficult to crack due to its huge cost. Therefore, we can use shorter seeds to reduce the result size.
+
+By default, each seed is 4 bytes. Since the seed is only 4 bytes, its hash has only 2<sup>32</sup> possibilities. To mitigate pre-computation attacks, we add the thread id to the salt so that each `slow_hash` uses a different salt:
+
+```lua
+function slow_hash(seed, iter)
+  let loop = iter / small_iter
+  let hash = seed
+
+  for i = 1 to loop
+    hash = pbkdf2_sha256(hash, salt .. thread_id, small_iter)
+  end
+  return hash
+end
+```
+
+Without the thread id, an attacker can make a `<seed, hash>` table, and then all threads can look up the table.
+
+With the thread id, the attacker must make a `<seed, id, hash>` table, which is `P` times more expensive (`P` is the number of threads).
+
+By estimation, if an attacker wants to double the decryption speed, it will require millions of top-level GPUs.
+
+![decryption](docs/images/encryption-2.webp)
+
+It's impossible to brute-force the last key directly, e.g. key4, because key4 not only comes from hash4, but also depends on key3, and key3 also depends on key2, and key2 depends on key1, they are chained together. Since each key is 32 bytes, it can neither be guessed nor brute-forced, it must be involved in its `slow_hash` computation.
+
+> If you want to use a longer seed, you can modify the `SEED_LEN` variable in the browser console.
+
 
 ## Known issues
 
-* Firefox: PBKDF2 is not optimized.（~50% slower)
+* GPU may crash when encrypting on mobile devices
 
-* Chrome: PBKDF2 cannot be run in parallel. (if it's a feature, I will consider using wasm instead)
+* Firefox: WebCrypto PBKDF2 is not optimized, and cannot be run in more than 2 threads. 
+
+* Chrome: WebCrypto PBKDF2 cannot be run in more than 1 thread.
+
+`Benchmark` can detect the number of threads that can be used.
 
 
 ## When to use
 
-* CPU performance benchmarks.
+* CPU/GPU performance benchmarks.
 
 * Post a CPU race on SNS, the first person to unlock it will get a coupon link. It is more interesting to compete on hardware than on luck.
 
@@ -103,8 +175,8 @@ We mix the call count (`id` above) into the salt to make pre-computation more di
 
 ## TODO
 
-* Using WebGL2/WebGPU for parallel computing
+* Using WebGPU instead of WebGL
 
 * Support saving and restoring progress
 
-* Shorten the seed length without reducing crypto strength
+()
