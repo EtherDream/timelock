@@ -1,8 +1,9 @@
 {
   "compilerOptions": {
-    "outDir": "docs",
     "target": "ESNext",
     "lib": ["ESNext", "DOM"],
+    "sourceMap": true,
+    "types": [],
     "strict": true
   },
   "include": [
