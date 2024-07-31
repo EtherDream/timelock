@@ -122,7 +122,7 @@ end
 
 不同于常见的 hash 算法，这里的 `slow_hash` 由于运行成本巨大，暴力破解非常困难。因此我们可使用更短的种子，从而减少最终结果的大小。
 
-演示程序默认使用 4 字节的种子。由于每个种子只有 4 字节，因此 hash 值只有 2<sup>32</sup> 种可能。为了缓解彩虹表攻击，我们将线程 id 添加到盐中，这样每个 `slow_hash` 使用不同的盐：
+演示程序默认使用 4 字节的种子。由于每个种子只有 4 字节，因此 hash 值只有 2<sup>32</sup> 种可能。为了缓解彩虹表攻击，我们将种子 id 添加到盐中，这样每个 `slow_hash` 使用不同的盐：
 
 ```lua
 function slow_hash(seed, iter)
@@ -130,15 +130,15 @@ function slow_hash(seed, iter)
   let hash = seed
 
   for i = 1 to loop
-    hash = pbkdf2_sha256(hash, salt .. thread_id, small_iter)
+    hash = pbkdf2_sha256(hash, salt .. seed_id, small_iter)
   end
   return hash
 end
 ```
 
-如果盐不带线程 id，攻击者可以创建一个 `<seed, hash>` 表，之后所有 `slow_hash` 可直接查表。
+如果盐不带种子 id，攻击者可以创建一个 `<seed, hash>` 表，之后所有 `slow_hash` 可直接查表。
 
-盐带上线程 id 后攻击者必须创建一个 `<seed, id, hash>` 表，成本需要 `P` 倍（`P` 为线程数）。
+盐带上种子 id 后攻击者必须创建一个 `<seed, id, hash>` 表，成本需要 `P` 倍（`P` 为线程数）。
 
 据估算，攻击者如果想提高一倍解密速度，大约需要数百万块顶级 GPU。
 
