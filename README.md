@@ -126,7 +126,7 @@ end
 
 Unlike common hash algorithms, the `slow_hash` algorithm here is very difficult to crack due to its huge cost. Therefore, we can use shorter seeds to reduce the result size.
 
-By default, each seed is 4 bytes. Since the seed is only 4 bytes, its hash has only 2<sup>32</sup> possibilities. To mitigate pre-computation attacks, we add the thread id to the salt so that each `slow_hash` uses a different salt:
+By default, each seed is 4 bytes. Since the seed is only 4 bytes, its hash has only 2<sup>32</sup> possibilities. To mitigate pre-computation attacks, we add the seed id to the salt so that each `slow_hash` uses a different salt:
 
 ```lua
 function slow_hash(seed, iter)
@@ -134,15 +134,15 @@ function slow_hash(seed, iter)
   let hash = seed
 
   for i = 1 to loop
-    hash = pbkdf2_sha256(hash, salt .. thread_id, small_iter)
+    hash = pbkdf2_sha256(hash, salt .. seed_id, small_iter)
   end
   return hash
 end
 ```
 
-Without the thread id, an attacker can make a `<seed, hash>` table, and then all threads can look up the table.
+Without the seed id, an attacker can make a `<seed, hash>` table, and then all `slow_hash` can look up the table.
 
-With the thread id, the attacker must make a `<seed, id, hash>` table, which is `P` times more expensive (`P` is the number of threads).
+With the seed id, the attacker must make a `<seed, id, hash>` table, which is `P` times more expensive (`P` is the number of threads).
 
 By estimation, if an attacker wants to double the decryption speed, it will require millions of top-level GPUs.
 
