@@ -125,7 +125,7 @@ function onProgressTimer() {
 
 function parseDecryptParams() {
   if (!txtCipher.value) {
-    showError('input is empty')
+    showError('cipher is empty')
     return
   }
   try {
@@ -397,7 +397,11 @@ async function startBenchmark() {
 }
 
 function readDecryptParams() {
-  const query = new URLSearchParams(location.hash.substring(1))
+  const frag = location.hash.substring(1)
+  if (!frag) {
+    return
+  }
+  const query = new URLSearchParams(frag)
   const params = {
     version: query.get('version'),
     cost: +query.get('cost'),
