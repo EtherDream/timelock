@@ -26,13 +26,13 @@ https://etherdream.github.io/timelock/decrypt.html
 
 Decryption uses only a single CPU thread.
 
-> It is recommended to use Safari for encryption (WebCrypto supports multi-threading) and Chrome for decryption (WebCrypto is the best optimized).
-
-## Test
-
 [Decryption Test](https://etherdream.github.io/timelock/decrypt.html#version=1.0.0&cost=600&cipher=vcATGmAwxIbxqe9ZRPIknvHTb-lyb2AreBgfmxmvCKK-pkmL-HuZ0VPFHQ&node.name=CPU+%28WebCrypto%29&node.iter=37500000&node.seedNum=8&node.seedLen=4&node.seeds=DcJkt5I2gUZqG1gQb_055GXA06sYQJ0L7ur0PESLiEo&node.salt=lFQ06ZnbXEIkl2X2&check=3t7MgQ)
 
 Click the `Decrypt` button and the message will be decrypted after ~30s.
+
+You can feedback your CPU model and decryption speed [here](https://github.com/EtherDream/timelock/issues/2) to help the project improve the decryption evaluation data.
+
+> It is recommended to use Safari for encryption (WebCrypto supports multi-threading) and Chrome for decryption (WebCrypto is the best optimized).
 
 ## How it works
 
@@ -178,5 +178,3 @@ It's impossible to brute-force the last key directly, e.g. key4, because key4 no
 * Using WebGPU instead of WebGL
 
 * Support saving and restoring progress
-
-()

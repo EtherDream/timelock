@@ -10,12 +10,11 @@
 
 https://etherdream.github.io/timelock/encrypt.html
 
-`Cost` 为解密成本，即解密过程需执行多少次 SHA256 函数。单位为 `MHash` (1 MHash = 1,000,000 Hash)。
-右侧可选择解密设备的 CPU 型号，用于评估解密时间。
+`Cost` 为解密成本，即解密过程需执行多少次 SHA256 函数。单位为 `MHash` (1 MHash = 1,000,000 Hash，即百万次)。右侧可选择解密设备的 CPU 型号，用于评估解密时间。
 
 `CPUs`, `GPUs` 为 CPU 和 GPU 的线程数，用于提高加密速度。
 
-加密前可先点击 `Benchmark` 进行硬件性能评估。笔记本电脑最好连接电源，否则性能将会受限。
+加密前可先点击 `Benchmark` 进行硬件性能评估。笔记本电脑最好连接电源，否则会影响性能甚至稳定性。不建议在手机浏览器上加密，容易导致页面崩溃。
 
 ### 解密
 
@@ -23,15 +22,13 @@ https://etherdream.github.io/timelock/decrypt.html
 
 解密只能使用 CPU 单线程。
 
-> 建议使用 Safari 加密 (WebCrypto 支持多线程)，Chrome 解密 (WebCrypto 优化得最好)。
-
-## 测试
-
-[测试数据](https://etherdream.github.io/timelock/decrypt.html#version=1.0.0&cost=600&cipher=vcATGmAwxIbxqe9ZRPIknvHTb-lyb2AreBgfmxmvCKK-pkmL-HuZ0VPFHQ&node.name=CPU+%28WebCrypto%29&node.iter=37500000&node.seedNum=8&node.seedLen=4&node.seeds=DcJkt5I2gUZqG1gQb_055GXA06sYQJ0L7ur0PESLiEo&node.salt=lFQ06ZnbXEIkl2X2&check=3t7MgQ)
+[解密测试数据](https://etherdream.github.io/timelock/decrypt.html#version=1.0.0&cost=600&cipher=vcATGmAwxIbxqe9ZRPIknvHTb-lyb2AreBgfmxmvCKK-pkmL-HuZ0VPFHQ&node.name=CPU+%28WebCrypto%29&node.iter=37500000&node.seedNum=8&node.seedLen=4&node.seeds=DcJkt5I2gUZqG1gQb_055GXA06sYQJ0L7ur0PESLiEo&node.salt=lFQ06ZnbXEIkl2X2&check=3t7MgQ)
 
 点击 `Decrypt` 按钮，大约 30 秒完成解密。
 
 你可以将 CPU 型号和解密速度反馈到[这里](https://github.com/EtherDream/timelock/issues/2)，从而为更多型号的 CPU 评估解密时间。（目前只收集了部分 CPU 性能数据）
+
+> 建议使用 Safari 加密 (WebCrypto 支持多线程)，Chrome 解密 (WebCrypto 优化得最好)。
 
 ## 原理
 
@@ -176,3 +173,5 @@ end
 * 增加进度保存和恢复功能
 
 * 加密可重复校验，防止加密过程中硬件计算错误导致消息永远无法解开
+
+* 尝试减少种子长度，避免数据过长难以分享
