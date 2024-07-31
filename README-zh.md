@@ -28,7 +28,9 @@ https://etherdream.github.io/timelock/decrypt.html
 
 你可以将 CPU 型号和解密速度反馈到[这里](https://github.com/EtherDream/timelock/issues/2)，从而为更多型号的 CPU 评估解密时间。（目前只收集了部分 CPU 性能数据）
 
-> 建议使用 Safari 加密 (WebCrypto 支持多线程)，Chrome 解密 (WebCrypto 优化得最好)。
+目前主流 CPU 大多内置 SHA256 专用指令，因此可通过硬件加速，例如 [Intel_SHA_extensions](https://en.wikipedia.org/wiki/Intel_SHA_extensions)，类似的 ARM 也有相应的指令。
+
+> 建议使用 Safari 加密 (WebCrypto 支持多线程)，Chrome 解密 (WebCrypto 优化得最好)。演示站点可参考 gh-pages 分支。
 
 ## 原理
 
