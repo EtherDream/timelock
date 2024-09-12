@@ -1,5 +1,5 @@
 import {WebGL2Const as GL} from './webgl-const'
-import {SIZE} from './util'
+import {SIZE, NUM} from './util'
 import FRAG_SHADER from './assets/shader.glsl'
 
 //
@@ -65,7 +65,7 @@ type ResMsgProgress = {
 }
 type ResMsgComplete = {
   type: ResMsgType.COMPLETE
-  ctxBuf: Uint32Array
+  ctxBuf?: Uint32Array
 }
 type ResMsgBenchmark = {
   type: ResMsgType.BENCHMARK
@@ -86,10 +86,6 @@ const workerEnv = () => {
 
   // "Transform Feedback" is simpler, but crashes frequently,
   // so we still use the GPGPU solution of WebGL1.
-
-  // colors per thread
-  const IN_COLOR_NUM = 8
-  const OUT_COLOR_NUM = 4
 
   //
   // threadNum = texW * texH
@@ -236,17 +232,17 @@ void main() {
     gl.uniform1ui(iterHandle, value * 2)
   }
 
-  function setThread(thread: number) {
-    if (threadNum === thread) {
+  function setThread(value: number) {
+    if (threadNum === value) {
       return
     }
-    threadNum = thread
+    threadNum = value
 
     // threadNum is a power of 2
     texW = threadNum / texH
     gl.viewport(0, 0, texW, texH)
 
-    for (let i = 0; i < OUT_COLOR_NUM; i++) {
+    for (let i = 0; i < NUM.OUT_COLOR; i++) {
       const outTex = gl.createTexture()
       if (!outTex) {
         throw Error('create outTex failed')
@@ -275,12 +271,12 @@ void main() {
   }
 
   function write(buf: Uint32Array) {
-    gl.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA32UI, texW, texH * IN_COLOR_NUM,
+    gl.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA32UI, texW, texH * NUM.IN_COLOR,
       0, GL.RGBA_INTEGER, GL.UNSIGNED_INT, buf)
   }
 
   function read(buf: Uint32Array) {
-    for (let i = 0; i < OUT_COLOR_NUM; i++) {
+    for (let i = 0; i < NUM.OUT_COLOR; i++) {
       const ptr = i * threadNum * SIZE.PIXEL
 
       gl.readBuffer(GL.COLOR_ATTACHMENT0 + i)
@@ -293,7 +289,7 @@ void main() {
     gl.drawArrays(GL.TRIANGLE_STRIP, 0, 4)
 
     // copy outTex[i] to inTex at P(0, i * texH)
-    for (let i = 0; i < OUT_COLOR_NUM; i++) {    
+    for (let i = 0; i < NUM.OUT_COLOR; i++) {    
       const dstX = 0
       const dstY = i * texH
 
@@ -306,7 +302,7 @@ void main() {
     setThread(thread)
     setIterPerDraw(iter)
 
-    const ctxBuf = new Uint32Array(thread * IN_COLOR_NUM * SIZE.PIXEL / 4)
+    const ctxBuf = new Uint32Array(thread * NUM.IN_COLOR * SIZE.PIXEL / 4)
     write(ctxBuf)
 
     const SAMPLE_NUM = 30
@@ -385,17 +381,10 @@ void main() {
         }
       }
     }
-    if (gl.isContextLost()) {
-      sendMsgToPage({
-        type: ResMsgType.PROGRESS,
-        iterAdded: -1,
-      })
-      return
-    }
     read(ctxBuf)
     sendMsgToPage({
       type: ResMsgType.COMPLETE,
-      ctxBuf,
+      ctxBuf: gl.isContextLost() ? undefined : ctxBuf,
     })
   }
 
@@ -463,11 +452,7 @@ function onWorkerMsg(e: MessageEvent) {
     initCallback(msg.errMsg)
     break
   case ResMsgType.PROGRESS:
-    if (msg.iterAdded === -1) {
-      completeCallback()
-    } else {
-      progressCallback(msg.iterAdded)
-    }
+    progressCallback(msg.iterAdded)
     break
   case ResMsgType.COMPLETE:
     completeCallback(msg.ctxBuf)
