@@ -7,7 +7,11 @@ export const enum SIZE {
 }
 
 export const enum NUM {
-  ITER_PER_LOOP = 1e7
+  ITER_PER_LOOP = 1e7,
+
+  // colors per thread
+  IN_COLOR = 8,
+  OUT_COLOR = 4,
 }
 
 export type EncryptParams = {
@@ -75,12 +79,6 @@ export function concatBuf(bufs: Uint8Array[], size: number) {
     pos += v.length
   }
   return ret
-}
-
-export function sleep(ms: number) {
-  return new Promise(fn => {
-    setTimeout(fn, ms)
-  })
 }
 
 export function isUint(value: number) {

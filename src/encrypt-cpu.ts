@@ -77,11 +77,8 @@ const workerEnv = () => {
   let isStopping: boolean
 
 
-  async function start(params: ReqMsgStart) {
+  async function start(seed: Uint8Array, salt: Uint8Array, iter: number) {
     isStopping = false
-
-    const {seed, salt, iter} = params
-    const loop = Math.ceil(iter / NUM.ITER_PER_LOOP)
 
     const pbkdfOpt: Pbkdf2Params = {
       name: 'PBKDF2',
@@ -89,6 +86,8 @@ const workerEnv = () => {
       salt,
       iterations: 0,
     }
+    const loop = Math.ceil(iter / NUM.ITER_PER_LOOP)
+
     let hash = seed
     let iterRemain = iter
 
@@ -150,7 +149,7 @@ const workerEnv = () => {
 
     switch (msg.type) {
     case ReqMsgType.START:
-      start(msg)
+      start(msg.seed, msg.salt, msg.iter)
       break
     case ReqMsgType.STOP:
       isStopping = true
