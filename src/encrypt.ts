@@ -229,6 +229,7 @@ export async function start(
 
   const encryptNodes: EncryptNode[] = []
   const hashesBuf = new Uint8Array(totalThread * SIZE.HASH)
+  let gpuCrashed = false
 
   // `iterRounded` is slightly larger than `iter`
   const iterRounded = iterPerSlice * sliceNum
@@ -271,6 +272,7 @@ export async function start(
 
       const ctxOut = await encryptWebGl.start(pbkdf2Ctx, gpuIter, onIterAdded)
       if (!ctxOut) {
+        gpuCrashed = true
         gpuAvailable = false
         break
       }
@@ -285,7 +287,7 @@ export async function start(
 
     console.timeEnd('gpu encryption')
 
-    if (!gpuAvailable) {
+    if (gpuCrashed) {
       if (cpuThread) {
         encryptCpu.stop()
       }
@@ -347,13 +349,13 @@ export async function start(
     startCpuTask(),
   ])
 
-  if (!gpuAvailable) {
+  if (gpuCrashed) {
     status = Status.READY
     return
   }
 
   // encrypt seeds
-  let key = new Uint8Array(SIZE.HASH)
+  const key = new Uint8Array(SIZE.HASH)
 
   for (let i = 0; i < totalThread; i++) {
     const hash = indexBuf(hashesBuf, SIZE.HASH, i)
