@@ -10,51 +10,48 @@
 <body>
   <h2>Timelock Encrypt</h2>
   <div class="rows">
-    <label>👁 Input:</label>
+    <span>👁 Input:</span>
   </div>
   <div>
     <textarea id="txtPlain">Hello World</textarea>
   </div>
   <div class="rows">
-    <label>⏰ Cost:</label>
-    <input id="txtCost" type="number" value="1000" min="1">
-    <span class="unit">MHash</span>
-    ≈<span id="txtCostTime"></span>
-    decryption time on
-    <select id="selectCpu"></select>
+    <span>💪 Cost:</span>
+    <input id="txtCost" type="number" value="1000" min="1" max="4294967295">
+    <span class="note">MHash. (<a href="decrypt.html">Decryption</a> will take ~<em id="txtEstimatedTime">00:00:00</em> on this browser)</span>
   </div>
   <div class="rows">
-    <label>🔀 CPUs:</label>
-    <input id="txtCpuThread" type="number" min="1">
-    <span id="txtCpuSpeed" class="unit"></span>
+    <span>🔀 GPUs:</span>
+    <input id="txtThread" type="number" value="8192" min="1" max="131072">
   </div>
   <div class="rows">
-    <label>🔀 GPUs:</label>
-    <input id="txtGpuThread" type="number" min="1">
-    <span id="txtGpuSpeed" class="unit"></span>
+    <span>⏰</span>
+    <span id="txtRemaining">-</span>
+    <span id="txtSpeed" class="note"></span>
   </div>
   <div class="rows">
-    <label>⏳</label>
+    <span>⏳</span>
+    <span id="txtProgPercent">0</span>%
+    <span class="note">
+      (<span id="txtProgVal">0</span>/<span id="txtProgMax">0</span>)
+    </span>
+  </div>
+  <div class="rows">
     <progress id="progressBar" value="0"></progress>
-    <span id="txtProgVal">0</span>/<span id="txtProgMax">0</span>
-    (<span id="txtProgPercent">0</span>%)
-    <span id="txtRemaining"></span>
   </div>
   <div class="rows">
     <button id="btnEncrypt">🔒 Encrypt</button>
-    <button id="btnBenchmark">📐 Benchmark</button>
     <button id="btnShare">🔗 Share</button>
   </div>
   <div class="rows">
-    <label>🔐 Output:</label>
+    <span>🔐 Output:</span>
   </div>
   <div>
     <textarea id="txtCipher" readonly></textarea>
   </div>
   <div id="batteryItem" hidden>
-    <label id="txtBatteryIcon"></label>
+    <span>🔋</span>
     Battery: <span id="txtBatteryLevel"></span>%
-    (Recommended to keep charging❗)
   </div>
   <div class="rows">
     <div id="txtError"></div>

@@ -1,9 +1,12 @@
 body, input, textarea {
   font-family: monospace;
-  font-size: 15px;
+  font-size: 14px;
 }
 input {
   width: 10em;
+}
+input:invalid {
+  color: red;
 }
 .rows {
   margin: 0.4em 0 0.2em 0;
@@ -16,13 +19,13 @@ input {
   height: 12.7em;
 }
 #progressBar {
-  width: 25em;
+  width: 100%;
 }
 #txtError {
   height: 1em;
   color: red;
 }
-.unit {
-  color: #555;
+.note {
+  color: #333;
   font-size: 0.9em;
 }

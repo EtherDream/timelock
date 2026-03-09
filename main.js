@@ -1,57 +1,29 @@
-import * as timelock from './timelock/index.js'
-
-const CPU_MODEL = {
-  "Intel": {
-    "Intel 12th": 18,
-    "Intel 9th": 5.5
-  },
-  "Apple": {
-    "Apple M1": 21,
-    "Apple A17 Pro": 14.5
-  }
+if (!Uint8Array.prototype.toHex) {
+  await import('https://cdnjs.cloudflare.com/ajax/libs/core-js/3.45.1/minified.js')
 }
+import * as timelock from './index.js'
 
 const isEncryption = location.pathname.includes('/encrypt.html')
-let isRunning = false
 
 
 function strToBin(str) {
   return new TextEncoder().encode(str)
 }
-
 function binToStr(bin) {
   return new TextDecoder().decode(bin)
 }
-
 function base64Decode(str) {
-  const b64 = str
-    .replace(/\-/g, '+')
-    .replace(/\_/g, '/')
-
-  const tmp = atob(b64)
-  const bin = new Uint8Array(tmp.length)
-  for (let i = 0; i < bin.length; i++) {
-    bin[i] = tmp.charCodeAt(i)
-  }
-  return bin
+  return Uint8Array.fromBase64(str, {alphabet: 'base64url'})
 }
-
 function base64Encode(bin) {
-  let str = ''
-  for (let i = 0; i < bin.length; i++) {
-    str += String.fromCharCode(bin[i])
-  }
-  return btoa(str)
-    .replace(/\=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
+  return bin.toBase64({alphabet: 'base64url'})
 }
 
-async function hashParams(json) {
+async function checksum(json) {
   const payload = strToBin(JSON.stringify(json))
   const buf = await crypto.subtle.digest('SHA-256', payload)
-  const bin = new Uint8Array(buf, 0, 4)
-  return base64Encode(bin)
+  const u32 = new Uint32Array(buf)
+  return u32[0]
 }
 
 function formatTime(ms) {
@@ -64,7 +36,7 @@ function formatTime(ms) {
 }
 
 function formatSpeed(hashPerSec) {
-  return (hashPerSec / 1e6).toFixed(2) + ' MHash/s'
+  return Math.round(hashPerSec / 1e6).toLocaleString() + ' MHash/s'
 }
 
 function showError(msg) {
@@ -84,7 +56,8 @@ function updateProgress(percent) {
 function startProgress(cost) {
   progressBar.max = cost
   txtProgMax.textContent = cost
-  txtRemaining.textContent = '...'
+  txtSpeed.textContent = ''
+  txtRemaining.textContent = '-'
 
   showError('')
   updateProgress(0)
@@ -96,16 +69,10 @@ function startProgress(cost) {
 
 function endProgress() {
   clearInterval(timerId)
-  txtRemaining.textContent = ''
-  if (!isEncryption) {
-    txtSpeed.textContent = ''
-  }
+  txtRemaining.textContent = formatTime(0)
 }
 
 function onProgressTimer() {
-  if (isPaused) {
-    return
-  }
   if (progressBar.value === 0) {
     return
   }
@@ -116,11 +83,8 @@ function onProgressTimer() {
   const timePerCost = timeUsed / progressBar.value
   const remain = progressBar.max - progressBar.value
 
-  txtRemaining.textContent = '≈' + formatTime(remain * timePerCost | 0)
-
-  if (!isEncryption) {
-    txtSpeed.textContent = '(' + formatSpeed(curHashPerSec) + ')'
-  }
+  txtRemaining.textContent = formatTime(remain * timePerCost | 0)
+  txtSpeed.textContent = '(' + formatSpeed(curHashPerSec) + ')'
 }
 
 function parseDecryptParams() {
@@ -135,114 +99,68 @@ function parseDecryptParams() {
   }
 }
 
-function updateDecryptUi() {
+function updateDecryptUi(isRunning) {
   txtCipher.disabled = isRunning
   txtPlain.disabled = isRunning
   btnDecrypt.disabled = isRunning
-
-  btnPause.disabled = !isRunning
-  btnStop.disabled = !isRunning
 }
 
 let curHashPerSec = 0
 
 async function onDecryptButtonClick() {
   const input = parseDecryptParams()
-  if (!input) {
+  if (!input || typeof input !== 'object') {
+    showError('invalid input')
     return
   }
-  const checkExp = input.check
-  input.check = ''
+  const chksumExp = input.checksum
+  input.checksum = ''
 
-  const checkGot = await hashParams(input)
-  if (checkGot !== checkExp) {
+  const chksumGot = await checksum(input)
+  if (chksumGot !== chksumExp) {
     showError('params corrupted')
     return
   }
-
-  const {cost} = input
+  if (input.version !== 2) {
+    showError('invalid version')
+    return
+  }
   const params = {
-    cost,
+    cost: input.cost,
+    salt: base64Decode(input.salt),
     cipher: base64Decode(input.cipher),
-    nodes: []
+    seedLen: input.seedLen,
+    seedNum: input.seedNum,
+    seeds: base64Decode(input.seeds),
   }
-  for (const node of input.nodes) {
-    params.nodes.push({
-      name: node.name,
-      iter: node.iter,
-      seedNum: node.seedNum,
-      seedLen: node.seedLen,
-      seeds: base64Decode(node.seeds),
-      salt: base64Decode(node.salt),
-    })
-  }
-  isRunning = true
   updateDecryptUi(true)
 
   txtPlain.value = ''
   curHashPerSec = 0
-  startProgress(cost)
+  startProgress(input.cost)
 
-  const plainBin = await timelock.decrypt.start(params, (percent, hashPerSec) => {
-    curHashPerSec = hashPerSec
+  const plainBin = await timelock.decrypt.start(params, (percent, speed) => {
+    curHashPerSec = speed
     updateProgress(percent)
   })
   endProgress()
 
-  if (isRunning) {
-    if (plainBin) {
-      txtPlain.value = binToStr(plainBin)
-    } else {
-      showError('decrypt failed')
-    }
+  if (plainBin) {
+    txtPlain.value = binToStr(plainBin)
+  } else {
+    showError('decrypt failed')
   }
-  isRunning = false
   updateDecryptUi(false)
 }
 
-let isPaused = false
 
-function onDecryptPauseButtonClick() {
-  timelock.decrypt.pause()
-  btnPause.disabled = true
-  btnResume.disabled = false
-  showError('paused')
-  isPaused = true
-}
-
-function onDecryptResumeButtonClick() {
-  timelock.decrypt.resume()
-  btnPause.disabled = false
-  btnResume.disabled = true
-  showError('')
-  lastTime = Date.now()
-  isPaused = false
-}
-
-
-function onDecryptStopButtonClick() {
-  if (!confirm('stop?')) {
-    return
-  }
-  isRunning = false
-  btnResume.click()
-  timelock.decrypt.stop()
-  showError('stopped')
-}
-
-
-function updateEncryptUi() {
+function updateEncryptUi(isRunning) {
   txtPlain.disabled = isRunning
   txtCipher.disabled = isRunning
-
   txtCost.disabled = isRunning
-  txtCpuThread.disabled = isRunning
-  if (timelock.encrypt.isGpuAvailable()) {
-    txtGpuThread.disabled = isRunning
-  }
+  txtThread.disabled = isRunning
 
   btnEncrypt.disabled = isRunning
-  btnBenchmark.disabled = isRunning
   btnShare.disabled = isRunning
 }
 
@@ -251,149 +169,69 @@ async function onEncryptButtonClick() {
     showError('input is empty')
     return
   }
-  if (!timelock.encrypt.getBenchmarkInfo()) {
-    if (confirm('benchmark first?')) {
-      startBenchmark()
-      return
-    }
-  }
-  const cost = txtCost.value >>> 0
-  if (cost < 1) {
-    showError('invalid cost')
+  if (txtCost.validity.rangeOverflow || txtThread.validity.rangeOverflow) {
+    showError('invalid params')
     return
   }
-  const cpuThread = +txtCpuThread.value
-  const gpuThread = +txtGpuThread.value
-  if (cpuThread < 0 || gpuThread < 0 || cpuThread + gpuThread === 0) {
-    showError('invalid threads')
-    return
-  }
+  const cost = +txtCost.value
 
   const params = {
     plain: strToBin(txtPlain.value),
     seedLen: Math.min(window.SEED_LEN, 32),
+    thread: +txtThread.value,
     cost,
-    cpuThread,
-    gpuThread,
   }
   txtPlain.value = ''
   txtCipher.value = ''
 
-  isRunning = true
-  updateEncryptUi()
+  updateEncryptUi(true)
   startProgress(cost)
 
-  const output = await timelock.encrypt.start(params, (percent) => {
-    if (percent === -1) {
-      showError('GPU Crashed')
-      txtGpuThread.disabled = true
-      txtGpuThread.value = 0
-      return
-    }
+  const output = await timelock.encrypt.start(params, (percent, speed) => {
+    curHashPerSec = speed
     updateProgress(percent)
   })
-  if (!output) {
-    return
-  }
   const json = {
-    version: '1.0.0',
-    cost: cost,
+    version: 2,
+    cost,
+    iter: output.iter,
+    salt: base64Encode(output.salt),
     cipher: base64Encode(output.cipher),
-    nodes: [],
-    check: '',
+    seedLen: output.seedLen,
+    seedNum: output.seedNum,
+    seeds: base64Encode(output.seeds),
+    checksum: '',
   }
-  for (const node of output.nodes) {
-    json.nodes.push({
-      name: node.name,
-      iter: node.iter,
-      seedNum: node.seedNum,
-      seedLen: node.seedLen,
-      seeds: base64Encode(node.seeds),
-      salt: base64Encode(node.salt),
-    })
-  }
-  json.check = await hashParams(json)
+  json.checksum = await checksum(json)
 
   txtCipher.value = JSON.stringify(json, null, 2)
   endProgress()
-
-  isRunning = false
-  updateEncryptUi()
+  updateEncryptUi(false)
 }
 
-async function onBenchmarkButtonClick() {
-  await startBenchmark()
-}
 
 function onShareButtonClick() {
   const params = parseDecryptParams()
   if (!params) {
     return
   }
-  const url = new URL(location.href.replace('/encrypt.html', '/decrypt.html'))
+  const url = new URL(location.href)
+  url.pathname = url.pathname.replace('/encrypt.html', '/decrypt.html')
+  url.hash = new URLSearchParams(params)
 
-  const query = new URLSearchParams()
-  query.set('version', params.version)
-  query.set('cost', params.cost)
-  query.set('cipher', params.cipher)
-
-  for (const node of params.nodes) {
-    for (const name of ['name', 'iter', 'seedNum', 'seedLen', 'seeds', 'salt']) {
-      query.append('node.' + name, node[name])
-    }
-  }
-  query.set('check', params.check)
-
-  url.hash = query
   navigator.clipboard.writeText(url)
   alert('link copied')
 }
 
 function onCostChange() {
   const cost = +txtCost.value
-  const speed = +selectCpu.options[selectCpu.selectedIndex].value
-  const sec = cost / speed
-  txtCostTime.textContent = formatTime(sec * 1000)
   txtProgMax.textContent = cost
-}
 
-function updateBenchmarkInfo(info) {
-  const {
-    cpuThread,
-    cpuHashPerSec,
-    gpuThread,
-    gpuHashPerSec,
-  } = info
-
-  txtCpuThread.value = cpuThread
-  txtGpuThread.value = gpuThread
-
-  if (cpuHashPerSec) {
-    txtCpuSpeed.textContent = formatSpeed(cpuHashPerSec * cpuThread)
+  if (benchmarkSpeed) {
+    const hashNum = cost * 1e6
+    const seconds = hashNum / benchmarkSpeed
+    txtEstimatedTime.textContent = formatTime(seconds * 1000)
   }
-  if (gpuHashPerSec) {
-    txtGpuSpeed.textContent = formatSpeed(gpuHashPerSec * gpuThread)
-  }
-  if (gpuHashPerSec < 0) {
-    txtGpuSpeed.textContent = 'webgl crashed'
-  }
-}
-
-async function startBenchmark() {
-  isRunning = true
-  updateEncryptUi()
-  txtCpuThread.value = 0
-  txtGpuThread.value = 0
-
-  if (timelock.encrypt.isGpuAvailable()) {
-    txtGpuSpeed.textContent = 'benchmarking...'
-  }
-  txtCpuSpeed.textContent = 'benchmarking...'
-
-  await timelock.encrypt.benchmark(updateBenchmarkInfo)
-  showError('')
-  isRunning = false
-  updateEncryptUi()
 }
 
 function readDecryptParams() {
@@ -403,94 +241,83 @@ function readDecryptParams() {
   }
   const query = new URLSearchParams(frag)
   const params = {
-    version: query.get('version'),
+    version: +query.get('version'),
     cost: +query.get('cost'),
+    salt: query.get('salt'),
     cipher: query.get('cipher'),
-    nodes: [],
-    check: query.get('check'),
-  }
-  const NUM_TYPE = ['iter', 'seedNum', 'seedLen']
-
-  for (const name of ['name', 'iter', 'seedNum', 'seedLen', 'seeds', 'salt']) {
-    query.getAll('node.' + name).forEach((v, i) => {
-      const node = params.nodes[i] || (params.nodes[i] = {})
-      node[name] = NUM_TYPE.includes(name) ? +v : v
-    })
+    seedLen: +query.get('seedLen'),
+    seedNum: +query.get('seedNum'),
+    seeds: query.get('seeds'),
+    checksum: +query.get('checksum'),
   }
   txtCipher.value = JSON.stringify(params, null, 2)
 }
 
-window.onbeforeunload = function() {
-  if (isRunning) {
-    return 'leave?'
+
+async function showBattery() {
+  const battery = await navigator.getBattery()
+  const update = () => {
+    if (battery.charging) {
+      batteryItem.hidden = true
+    } else {
+      batteryItem.hidden = false
+      txtBatteryLevel.textContent = battery.level * 100 | 0
+    }
   }
+  battery.onchargingchange = update
+  battery.onlevelchange = update
+  update()
+}
+
+let benchmarkSpeed = 0
+
+async function benchmark(iter) {
+  const opt = {
+    name: 'PBKDF2',
+    hash: 'SHA-256',
+    salt: crypto.getRandomValues(new Uint8Array(16)),
+    iterations: iter
+  }
+  const k = await crypto.subtle.importKey(
+    'raw', Uint8Array.of(0), 'PBKDF2', false, ['deriveBits']
+  )
+  const t0 = performance.now()
+  await crypto.subtle.deriveBits(opt, k, 256)
+  const t1 = performance.now()
+
+  return iter / (t1 - t0) * 1000 * 2
 }
 
 async function initEncryptPage() {
   window.SEED_LEN = 4
 
-  await timelock.encrypt.init()
-
-  const benchmarkInfo = timelock.encrypt.getBenchmarkInfo()
-  if (benchmarkInfo) {
-    txtCpuThread.value = benchmarkInfo.cpuThread
-    txtGpuThread.value = benchmarkInfo.gpuThread
-  } else {
-    txtCpuThread.value = 1
-    txtGpuThread.value = 1024
+  const ok = await timelock.encrypt.init()
+  if (!ok) {
+    showError('WebGPU is not available')
+    return
   }
+  btnEncrypt.onclick = onEncryptButtonClick
+  btnShare.onclick = onShareButtonClick
 
-  if (!timelock.encrypt.isGpuAvailable()) {
-    txtGpuThread.disabled = true
-    txtGpuThread.value = 0
-  }
-
-  for (const [vendor, map] of Object.entries(CPU_MODEL)) {
-    const optgroup = document.createElement('optgroup')
-    optgroup.label = vendor
-
-    for (const [model, iter] of Object.entries(map)) {
-      const opt = new Option(model, iter)
-      optgroup.appendChild(opt)
-    }
-    selectCpu.appendChild(optgroup)
-  }
-
+  txtCost.oninput = onCostChange
+  
   if (navigator.getBattery) {
-    const battery = await navigator.getBattery()
-    const update = () => {
-      if (battery.charging) {
-        batteryItem.hidden = true
-      } else {
-        batteryItem.hidden = false
-        txtBatteryIcon.textContent = battery.level < 0.5 ? '🪫' : '🔋'
-        txtBatteryLevel.textContent = battery.level * 100
-      }
-    }
-    battery.onchargingchange = update
-    battery.onlevelchange = update
-    update()
+    showBattery()
   } else {
     batteryItem.hidden = true
   }
 
-  btnEncrypt.onclick = onEncryptButtonClick
-  btnBenchmark.onclick = onBenchmarkButtonClick
-  btnShare.onclick = onShareButtonClick
-
-  txtCost.oninput = onCostChange
-  selectCpu.oninput = onCostChange
+  // warmup
+  await benchmark(1e5)  
+  benchmarkSpeed = await benchmark(1e6)
   onCostChange()
+  console.log('decryption benckmark:', formatSpeed(benchmarkSpeed))
 }
 
 async function initDecryptPage() {
   window.onhashchange = readDecryptParams
   readDecryptParams()
-
   btnDecrypt.onclick = onDecryptButtonClick
-  btnPause.onclick = onDecryptPauseButtonClick
-  btnResume.onclick = onDecryptResumeButtonClick
-  btnStop.onclick = onDecryptStopButtonClick
 }
 
 async function main() {

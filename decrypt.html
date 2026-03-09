@@ -10,30 +10,31 @@
 <body>
   <h2>Timelock Decrypt</h2>
   <div class="rows">
-    <label>🔐 Input:</label>
+    <span>🔐 Input:</span>
   </div>
   <div>
     <textarea id="txtCipher"></textarea>
   </div>
   <div class="rows">
-    <label>⏳</label>
-    <progress id="progressBar" value="0"></progress>
-    <span id="txtProgVal">0</span>/<span id="txtProgMax">0</span>
-    (<span id="txtProgPercent">0</span>%)
+    <span>⏰</span>
+    <span id="txtRemaining">-</span>
+    <span id="txtSpeed" class="note"></span>
   </div>
   <div class="rows">
-    <label>⏰</label>
-    <span id="txtRemaining"></span>
-    <span id="txtSpeed" class="unit"></span>
+    <span>⏳</span>
+    <span id="txtProgPercent">0</span>%
+    <span class="note">
+      (<span id="txtProgVal">0</span>/<span id="txtProgMax">0</span>)
+    </span>
+  </div>
+  <div class="rows">
+    <progress id="progressBar" value="0"></progress>
   </div>
   <div class="rows">
     <button id="btnDecrypt">🔓 Decrypt</button>
-    <button id="btnPause" disabled>⏸️ Pause</button>
-    <button id="btnResume" disabled>⏯️ Resume</button>
-    <button id="btnStop" disabled>⏹️ Stop</button>
   </div>
   <div class="rows">
-    <label>👁 Output:</label>
+    <span>👁 Output:</span>
   </div>
   <div>
     <textarea id="txtPlain" readonly></textarea>
