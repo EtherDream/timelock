@@ -1,367 +1,236 @@
+import SHADER from './assets/shader.wgsl'
+import * as wasm from './wasm'
+
 import {
   SIZE,
-  NUM,
+  MAX_ITER_PER_PBKDF2,
   DecryptParams,
   EncryptParams,
-  EncryptNode,
 
-  readCache,
-  writeCache,
   aesEncrypt,
   fillRandomBytes,
-  isPositiveInt,
-  isUint,
-  isPowerOf2,
-  indexBuf,
-  cloneBuf,
+  getBlockByIndex,
+  // cloneBuf,
   xorBuf,
 } from './util'
 
-import * as encryptCpu from './encrypt-cpu'
-import * as encryptWebGl from './encrypt-webgl'
-import * as wasm from './wasm'
 
-
-export type BenchmarkInfo = {
-  cpuThread: number
-  gpuThread: number
-  cpuHashPerSec: number
-  gpuHashPerSec: number
-}
-let benchmarkInfo: BenchmarkInfo | undefined
-
-const BENCHMARK_FILE = '/.timelock/benchmark.json'
-
-
-async function readInfo() {
-  const res = await readCache(BENCHMARK_FILE)
-  if (!res) {
-    return
-  }
-  let info: BenchmarkInfo
-  try {
-    info = await res.json()
-  } catch {
-    console.warn('invalid benchmark cache')
-    return
-  }
-  if (typeof info === 'object' &&
-    isPositiveInt(info.cpuThread) &&
-    isPositiveInt(info.cpuHashPerSec) &&
-    isUint(info.gpuThread) &&
-    isUint(info.gpuHashPerSec)
-  ) {
-    return info
+async function getGpuDevice() {
+  const adapter = await navigator.gpu.requestAdapter({
+    powerPreference: 'high-performance',
+  })
+  if (adapter) {
+    const device = await adapter.requestDevice()
+    return device
   }
 }
-
-async function saveInfo(info: BenchmarkInfo) {
-  const data = JSON.stringify(info)
-  await writeCache(BENCHMARK_FILE, data)
-}
-
-
-const enum Status {
-  NONE,
-  INITING,
-  READY,
-  BENCHMARKING,
-  RUNNING,
-  PAUSED,
-}
-let status: Status = Status.NONE
-let gpuAvailable = true
-
 
 export async function init() {
-  if (status !== Status.NONE) {
-    return
+  const device = await getGpuDevice()
+  if (!device) {
+    return false
   }
-  status = Status.INITING
-
-  await wasm.init()
-  const errMsg = await encryptWebGl.init()
-  if (errMsg) {
-    console.warn('init webgl error:', errMsg)
-    gpuAvailable = false
-  }
-  benchmarkInfo = await readInfo()
-
-  status = Status.READY
+  wasm.init()
+  return true
 }
 
-export function isGpuAvailable() {
-  return gpuAvailable
-}
-
-export async function benchmark(
-  onProgress: (info: BenchmarkInfo) => void
-) {
-  if (status !== Status.READY) {
-    return
-  }
-  status = Status.BENCHMARKING
-
-  const info: BenchmarkInfo = {
-    cpuThread: 0,
-    gpuThread: 0,
-    cpuHashPerSec: 0,
-    gpuHashPerSec: 0,
-  }
-
-  await encryptCpu.benchmark((iterPerMs, thread) => {
-    info.cpuHashPerSec = iterPerMs * 1000 * 2
-    info.cpuThread = thread
-    onProgress(info)
-  })
-
-  if (gpuAvailable) {
-    await encryptWebGl.benchmark((iterPerMs, thread) => {
-      info.gpuHashPerSec = iterPerMs * 1000 * 2
-      info.gpuThread = thread
-      onProgress(info)
-    })
-  }
-
-  await saveInfo(info)
-  benchmarkInfo = info
-
-  status = Status.READY
-}
-
-export function getBenchmarkInfo() {
-  return benchmarkInfo
-}
-
-export function pause() {
-  if (status !== Status.RUNNING) {
-    return
-  }
-  status = Status.PAUSED
-  encryptCpu.pause()
-  encryptWebGl.pause()
-}
-
-export function resume() {
-  if (status !== Status.PAUSED) {
-    return
-  }
-  status = Status.RUNNING
-  encryptCpu.resume()
-  encryptWebGl.resume()
-}
-
-export function stop() {
-  if (status !== Status.RUNNING) {
-    return
-  }
-  status = Status.READY
-  encryptCpu.stop()
-  encryptWebGl.stop()
-}
+/** @workgroup_size() in shader.wgsl */
+const WORKGROUP_SIZE = 64
 
 export async function start(
   params: EncryptParams,
-  onProgress: (percent: number) => boolean
+  onProgress: (percent: number, hashPerSec: number) => void
 ) {
-  if (status !== Status.READY) {
-    throw Error('invalid status')
-  }
-  if (!benchmarkInfo) {
-    await benchmark(() => {})
-  }
-  status = Status.RUNNING
-
   const plain = params.plain
   const cost = params.cost
-  const seedLen = params.seedLen | 0
+  const seedLen = params.seedLen
+  let thread = params.thread
 
-  let cpuThread = params.cpuThread | 0
-  let gpuThread = params.gpuThread | 0
-
-  if (!gpuAvailable) {
-    gpuThread = 0
-  }
-  if (cpuThread < 0) {
-    throw Error('cpuThread must be >= 0')
-  }
-  if (gpuThread < 0) {
-    throw Error('gpuThread must be >= 0')
-  }
-  if (cpuThread + gpuThread === 0) {
-    throw Error('no available thread')
-  }
   if (cost < 1) {
     throw Error('cost must be >= 1')
   }
   if (seedLen <= 0 || seedLen > 32) {
     throw Error('seedLen must in [1, 32]')
   }
-
-  if (gpuThread && gpuThread < 32) {
-    gpuThread = 32
+  if (thread < WORKGROUP_SIZE) {
+    thread = WORKGROUP_SIZE
   }
-  if (!isPowerOf2(gpuThread)) {
-    gpuThread = 1 << Math.log2(gpuThread)
+  if (thread > 131072) {
+    thread = 131072
   }
-  if (cpuThread > 512) {
-    cpuThread = 512
-  }
-  if (gpuThread > 65536) {
-    gpuThread = 65536
-  }
-  const totalThread = gpuThread + cpuThread
-
-  // 1 cost = 1 Mhash
-  // 1 hash = 0.5 iter
-  const iter = Math.round(cost * 1e6 / 2)
-
-  const {cpuHashPerSec, gpuHashPerSec} = benchmarkInfo!
-  const cpuSpeedRatio = gpuThread
-    ? Math.round(cpuHashPerSec / gpuHashPerSec)
-    : 1
-
-  const sliceNum = gpuThread + cpuThread * cpuSpeedRatio
-  const iterPerSlice = Math.ceil(iter / sliceNum)
-
-  const seedsBuf = new Uint8Array(totalThread * seedLen)
-  fillRandomBytes(seedsBuf)
-
-  const encryptNodes: EncryptNode[] = []
-  const hashesBuf = new Uint8Array(totalThread * SIZE.HASH)
-  let gpuCrashed = false
-
-  // `iterRounded` is slightly larger than `iter`
-  const iterRounded = iterPerSlice * sliceNum
-  let iterCompleted = 0
-
-  const onIterAdded = (iterAdded: number) => {
-    iterCompleted += iterAdded
-    onProgress(iterCompleted / iterRounded)
+  if (thread % WORKGROUP_SIZE) {
+    thread = Math.ceil(thread / WORKGROUP_SIZE) * WORKGROUP_SIZE
+    console.log('thread rounded up to:', thread)
   }
 
-  const startGpuTask = async () => {
-    if (gpuThread === 0) {
-      return
-    }
-    console.time('gpu encryption')
+  const workgroupNum = thread / WORKGROUP_SIZE
 
-    const gpuSalt = wasm.getSaltBuf()
-    fillRandomBytes(gpuSalt)
+  const startCtxBuf = wasm.getStartCtxBuf(thread)
+  const ctxWBuf = wasm.getCtxWBuf(thread)
+  const ctxRBuf = wasm.getCtxRBuf(thread)
+  const ioBuf = wasm.getIoBuf(thread)
 
-    const INTERVAL = 25
-    const iterPerMs = gpuHashPerSec / 1000 / 2
-    const iterPerDraw = iterPerMs * INTERVAL | 0
+  const salt = wasm.getSaltBuf()
+  fillRandomBytes(salt)
 
-    encryptWebGl.setIterPerDraw(iterPerDraw)
-    encryptWebGl.setThread(gpuThread)
+  const seeds = new Uint8Array(thread * seedLen)
+  fillRandomBytes(seeds)
 
-    const pbkdf2Ctx = wasm.getCtxBuf(gpuThread)
-    const gpuHashes = wasm.getHashesBuf(gpuThread)
-    const gpuSeeds = seedsBuf.subarray(0, seedLen * gpuThread)
+  ioBuf.set(seeds)
 
-    gpuHashes.set(gpuSeeds)
-    wasm.pbkdf2Pre(gpuThread, seedLen)
-
-    let iterRemain = iterPerSlice
-
-    do {
-      // 1 iter has been performed at pbkdf2Pre
-      const gpuIter = Math.min(iterRemain, NUM.ITER_PER_LOOP) - 1
-      onIterAdded(gpuThread)
-
-      const ctxOut = await encryptWebGl.start(pbkdf2Ctx, gpuIter, onIterAdded)
-      if (!ctxOut) {
-        gpuCrashed = true
-        gpuAvailable = false
-        break
-      }
-      pbkdf2Ctx.set(ctxOut)
-      wasm.pbkdf2Post(gpuThread)
-
-      // next loop
-      wasm.pbkdf2Pre(gpuThread, SIZE.HASH)
-
-      iterRemain -= NUM.ITER_PER_LOOP
-    } while (iterRemain > 0)
-
-    console.timeEnd('gpu encryption')
-
-    if (gpuCrashed) {
-      if (cpuThread) {
-        encryptCpu.stop()
-      }
-      onProgress(-1)
-      return
-    }
-    encryptNodes[0] = {
-      name: 'GPU (WebGL)',
-      iter: iterPerSlice,
-      seedLen: seedLen,
-      seedNum: gpuThread,
-      seeds: gpuSeeds,
-      salt: cloneBuf(gpuSalt),
-    }
-    hashesBuf.set(gpuHashes)
-  }
-
-  const startCpuTask = async () => {
-    if (cpuThread === 0) {
-      return
-    }
-    console.time('cpu encryption')
-
-    const seedsBegin = seedLen * gpuThread
-    const seedsEnd = seedLen * (gpuThread + cpuThread)
-    const cpuSeeds = seedsBuf.subarray(seedsBegin, seedsEnd)
-
-    const cpuSalt = new Uint8Array(SIZE.SALT)
-    fillRandomBytes(cpuSalt)
-
-    const cpuIter = iterPerSlice * cpuSpeedRatio
-    const cpuHashes = await encryptCpu.start(
-      cpuThread,
-      cpuSeeds,
-      seedLen,
-      cpuSalt,
-      cpuIter,
-      onIterAdded,
-    )
-    console.timeEnd('cpu encryption')
-
-    // aborted
-    if (!cpuHashes) {
-      return
-    }
-    encryptNodes[1] = {
-      name: 'CPU (WebCrypto)',
-      iter: cpuIter,
-      seedNum: cpuThread,
-      seedLen: seedLen,
-      seeds: cpuSeeds,
-      salt: cpuSalt,
-    }
-    hashesBuf.set(cpuHashes, gpuThread * SIZE.HASH)
-  }
-
-  await Promise.all([
-    startGpuTask(),
-    startCpuTask(),
-  ])
-
-  if (gpuCrashed) {
-    status = Status.READY
+  const gpu = await getGpuDevice()
+  if (!gpu) {
     return
   }
+  gpu.addEventListener('uncapturederror', e => {
+    // console.warn(e.error.message)
+  })
 
-  // encrypt seeds
+  const module = gpu.createShaderModule({
+    code: SHADER,
+  })
+  await module.getCompilationInfo()
+
+  const pipeline = gpu.createComputePipeline({
+    layout: 'auto',
+    compute: {
+      module,
+    }
+  })
+
+  // input params
+  // (read-only, aligned to 16 bytes)
+  const enum ID {
+    STEP,
+  }
+  const uniformParams = new Uint32Array(4)
+
+  const gpuUniformParams = gpu.createBuffer({
+    size: uniformParams.byteLength,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  })
+
+  // start_ctx.inner.state and start_ctx.outer.state
+  // (read-only)
+  const gpuStartCtx = gpu.createBuffer({
+    size: startCtxBuf.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  })
+
+  // sha256 words
+  const gpuCtxW = gpu.createBuffer({
+    size: ctxWBuf.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+  })
+
+  // result
+  const gpuCtxR = gpu.createBuffer({
+    size: ctxRBuf.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+  })
+
+  const bindGroup = gpu.createBindGroup({
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: gpuUniformParams } },
+      { binding: 1, resource: { buffer: gpuStartCtx } },
+      { binding: 2, resource: { buffer: gpuCtxW } },
+      { binding: 3, resource: { buffer: gpuCtxR } },
+    ],
+  })
+  const readbackGpuBuf = gpu.createBuffer({
+    size: ctxRBuf.byteLength,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+  })
+
+  // 1 cost = 1M Hash
+  const hashNum = cost * 1e6
+
+  // PBKDF2 performs SHA256 twice in each iteration
+  const iterTotal = hashNum / 2
+
+  // number of iterations required per seed
+  const iterMax = Math.ceil(iterTotal / thread)
+
+  // number of iterations completed per seed
+  let iterCur = 0
+ 
+  // iteration step of each GPU execution
+  let step = 500
+
+  const pbkdf2Times = Math.ceil(iterMax / MAX_ITER_PER_PBKDF2)
+  const pbkdf2Iter = Math.ceil(iterMax / pbkdf2Times)
+
+  let seq = 0
+  wasm.pbkdf2Pre(thread, seedLen, seq)
+
+  for (seq = 1; seq <= pbkdf2Times; seq++) {
+    let remainPbkdf2Iter = pbkdf2Iter
+
+    gpu.queue.writeBuffer(gpuStartCtx, 0, startCtxBuf)
+    gpu.queue.writeBuffer(gpuCtxW, 0, ctxWBuf)
+    gpu.queue.writeBuffer(gpuCtxR, 0, ctxRBuf)
+
+    // Split a single PBKDF2 into multiple calls to
+    // prevent a single call from taking too long on the GPU.
+    do {
+      if (step > remainPbkdf2Iter) {
+        step = remainPbkdf2Iter
+      }
+      // 1x iter => 2x hash
+      uniformParams[ID.STEP] = step * 2
+      gpu.queue.writeBuffer(gpuUniformParams, 0, uniformParams)
+
+      const cmd = gpu.createCommandEncoder()
+      const pass = cmd.beginComputePass()
+      pass.setPipeline(pipeline)
+      pass.setBindGroup(0, bindGroup)
+      pass.dispatchWorkgroups(workgroupNum)
+      pass.end()
+
+      cmd.copyBufferToBuffer(gpuCtxR, 0, readbackGpuBuf, 0, readbackGpuBuf.size)
+      gpu.queue.submit([cmd.finish()])
+
+      const t0 = performance.now()
+      await gpu.queue.onSubmittedWorkDone()
+      const t1 = performance.now()
+
+      remainPbkdf2Iter -= step
+      iterCur += step
+
+      // update step to keep each call takes ~1s
+      const stepPerMs = step / Math.max(t1 - t0, 0.01)
+      step = Math.ceil(stepPerMs * 1000)
+
+      onProgress(iterCur / iterMax, step * thread * 2)
+    } while (remainPbkdf2Iter)
+
+
+    await readbackGpuBuf.mapAsync(GPUMapMode.READ)
+    const readbackJsBuf = readbackGpuBuf.getMappedRange()
+  
+    ctxRBuf.set(new Uint8Array(readbackJsBuf))
+    readbackGpuBuf.unmap()
+
+    wasm.pbkdf2Post(thread)
+
+    if (seq < pbkdf2Times) {
+      // output as next input
+      wasm.pbkdf2Pre(thread, SIZE.HASH, seq)
+    }
+  }
+  gpu.destroy()
+
+  //
+  // encrypt seeds and generate key
+  //
   const key = new Uint8Array(SIZE.HASH)
 
-  for (let i = 0; i < totalThread; i++) {
-    const hash = indexBuf(hashesBuf, SIZE.HASH, i)
-    const seed = indexBuf(seedsBuf, seedLen, i)
-
+  for (let p = 0; p < thread; p++) {
+    const seed = getBlockByIndex(seeds, seedLen, p)
     xorBuf(seed, key, seedLen)
+
+    const hash = getBlockByIndex(ioBuf, SIZE.HASH, p)
     xorBuf(key, hash, SIZE.HASH)
   }
 
@@ -369,8 +238,10 @@ export async function start(
   const output: DecryptParams = {
     cost,
     cipher,
-    nodes: encryptNodes.filter(v => v),
+    salt,
+    seedNum: thread,
+    seedLen,
+    seeds,
   }
-  status = Status.READY
   return output
 }

@@ -9,12 +9,16 @@ export default {
         exclude: /node_modules/,
       },
       {
-        test: /\.(glsl|wgsl)$/,
+        test: /\.wgsl$/,
         type: 'asset/source',
       },
       {
         test: /\.wasm$/,
         type: 'asset/inline',
+        generator: {
+          // no `data:` prefix
+          dataUrl: content => content.toString('base64')
+        }
       },
     ],
   },
