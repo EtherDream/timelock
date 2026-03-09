@@ -1,49 +1,43 @@
 export const enum SIZE {
   HASH = 32,
-  SALT = 12,
-  SALT_WITH_ID = SALT + 4,
-  PIXEL = 16,
-  CTX = 128,
+  SALT = 16,
 }
 
-export const enum NUM {
-  ITER_PER_LOOP = 1e7,
+// ~1 second
+export const MAX_ITER_PER_PBKDF2 = 2e7
 
-  // colors per thread
-  IN_COLOR = 8,
-  OUT_COLOR = 4,
-}
 
 export type EncryptParams = {
-  plain: Uint8Array
+  plain: Uint8Array<ArrayBuffer>
   cost: number
   seedLen: number
-  cpuThread: number
-  gpuThread: number
-}
-
-export type EncryptNode = {
-  name: string
-  iter: number
-  seedNum: number
-  seedLen: number
-  seeds: Uint8Array
-  salt: Uint8Array
+  thread: number
 }
 
 export type DecryptParams = {
   cost: number
-  cipher: Uint8Array
-  nodes: EncryptNode[]
+  cipher: Uint8Array<ArrayBuffer>
+  salt: Uint8Array<ArrayBuffer>
+  seedNum: number
+  seedLen: number
+  seeds: Uint8Array<ArrayBuffer>
 }
 
-export async function aesEncrypt(plain: Uint8Array, key: Uint8Array, iv: Uint8Array) {
+export async function aesEncrypt(
+  plain: Uint8Array<ArrayBuffer>,
+  key: Uint8Array<ArrayBuffer>,
+  iv: Uint8Array<ArrayBuffer>
+) {
   const k = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt'])
   const buf = await crypto.subtle.encrypt({name: 'AES-GCM', iv}, k, plain)
   return new Uint8Array(buf)
 }
 
-export async function aesDecrypt(cipher: Uint8Array, key: Uint8Array, iv: Uint8Array) {
+export async function aesDecrypt(
+  cipher: Uint8Array<ArrayBuffer>,
+  key: Uint8Array<ArrayBuffer>,
+  iv: Uint8Array<ArrayBuffer>
+) {
   const k = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['decrypt'])
   const buf = await crypto.subtle.decrypt({name: 'AES-GCM', iv}, k, cipher)
   return new Uint8Array(buf)
@@ -62,35 +56,9 @@ export function xorBuf(dst: Uint8Array, src: Uint8Array, len: number) {
   }
 }
 
-export function indexBuf(buf: Uint8Array, sliceLen: number, index: number) {
-  const offset = index * sliceLen
-  return buf.subarray(offset, offset + sliceLen)
-}
-
-export function cloneBuf(buf: Uint8Array) {
-  return buf.slice(0)
-}
-
-export function concatBuf(bufs: Uint8Array[], size: number) {
-  const ret = new Uint8Array(size)
-  let pos = 0
-  for (const v of bufs) {
-    ret.set(v, pos)
-    pos += v.length
-  }
-  return ret
-}
-
-export function isUint(value: number) {
-  return value === Math.floor(value)
-}
-
-export function isPositiveInt(value: number) {
-  return value > 0 && isUint(value)
-}
-
-export function isPowerOf2(value: number) {
-  return (value & (value - 1)) === 0
+export function getBlockByIndex(buf: Uint8Array<ArrayBuffer>, blockLen: number, index: number) {
+  const offset = index * blockLen
+  return buf.subarray(offset, offset + blockLen)
 }
 
 export async function readCache(url: string) {
