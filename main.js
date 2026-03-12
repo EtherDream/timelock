@@ -169,7 +169,7 @@ async function onEncryptButtonClick() {
     showError('input is empty')
     return
   }
-  if (txtCost.validity.rangeOverflow || txtThread.validity.rangeOverflow) {
+  if (!txtCost.validity.valid || !txtThread.validity.valid) {
     showError('invalid params')
     return
   }
