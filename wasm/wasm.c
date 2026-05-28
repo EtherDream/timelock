@@ -162,9 +162,6 @@ void pbkdf2_loop(int id, int iter) {
 
   memcpy(ctx_w_arr[id], W, 32);
   memcpy(ctx_r_arr[id], r, 32);
-
-  // memcpy(start_ctx_arr[id].inner_state, inner_state, 32);
-  // memcpy(start_ctx_arr[id].outer_state, outer_state, 32);
 }
 
 

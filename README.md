@@ -22,7 +22,7 @@ https://etherdream.github.io/timelock/decrypt.html
 
 Decryption is inherently single-threaded and runs on the CPU.
 
-[Decryption Test](https://etherdream.github.io/timelock/decrypt.html#version=2&cost=1000&salt=BleKXJAoxHh4IuEcGKajyA%3D%3D&cipher=Ldl2d5p3gxBNIUhtU9BFIp-4C_ShZUJRQ7jkRNavsbxy54Ac6Som5En3&seedLen=4&seedNum=64&seeds=8miYnIiIkE7xLWHDuoWIyC-6_6Wq35gs_CocC5XnIljbULyTua8kdJDjIT6CVsZTO2XwzMeZ0X27W_Nf_shqt-2oBbMUJw7PUkYiwwpSA4m7dI2Vu92qC2xDT1uzFfMsHQmyEdw-6Wbxis7T3_3g-N4eKc7OVz62jdWwgxhzEE0MbJwjFEmfbwg7a7wH1850BcC3-irK7zEf_0Z5R7A008xfA4s0xqYQmASW-O43Evh-_-Mbfy4YSbk-8TwdDn0YsfGrLEmqcMNAC-U1jcXMZ_e2cuJ41si1EZXqDcegtW2qFP8sLQq8imaY2bvU_iRb3GA8AkdPigNqzCD3QYPqgg%3D%3D&checksum=2799229604)
+[Decryption Test](https://etherdream.github.io/timelock/decrypt.html#version=2&cost=1000&salt=Ml1qbIIBmTJWJsxx1Xs1qg%3D%3D&cipher=OZ2TTkjn3TZ0efcvL3LlWlK8TGigW4NGcPdWrx6qVJQCa3F_8CkuzVgs&seedLen=4&seedNum=256&seeds=3EBDImkdHTICBxUrCPqlXwKZ2cvXOF7XMF9jgFaaRn3PwgXj7BDM8JNLKll0PMpcif5JrGHKKHZi71XTRxup1AktMgDp3CXg_QELCgN3uhqCOJcNnloS1Q2marFaWGYOBaSSRKOdsulGyK7LT8xPftcOKt3VOsC9XZGfp746h2NNV_rFDFPtf7FjGJRMtyfGnD-gQuGGmmDRzOJYBs44Xlms5euga41r-JVMQPmQDjhAkZkcjyuRCIC_cYf4zXZm1fUcknM08gP4xonFxVM6xT1IYwOhsA9IvuAmqLi7h4CnKOr1aponw2zZ-rJ12WIRJCBBIUeyuTXKLjrkaUtkGYGG_zLr80q6X3tbiuyNcRSS5zBGu2pvmtcCT2FUlf3N0feoEgflVU8g8oKiKTY4XzcMgSxWaKCdoz4jqwiDUOpVj9Qa8YEoZOFoNsUsxBISRB4eS9lPQmy6wdtMo4cAUkqApTVilgBC143UJKZjMRf9KRBpDaH2TnC4mcmoyLog43LVq_et_ZixizH8O-1wwKm7bGH6NF85S9Pwe8mbY3m0poTFU8g9SlWQ884ZU7mJpGnxRMhAKVzCL_o3lCumy7hBqEPF3qq1OraQqKLK-NOLa1Xspy-2Sx3m1JS2O4XlHPa9ZdyGcF1vIg623wGD2lggaTFhhtECzqpp8UMEKNDBd2PKViTmuMyRj2isvwSurheh7yYnD-nhS_4FZD5rDzKNMtmpSw46taZOMEdtGh_mSzpQiV1fOFaWETb2uAd-LnMMXGOGhAZlBjEjda07mcaqgqe3xtwJMY1UcXJ59XiFO0kbmQF_fnJhwWhmwFNQYXBqpd-H87OlMHFHNFN8l_ZGrxJ0nqMKw5GO6CuDLjJ-fAdGaB11mJ2cYPuTXOmmGtA7aAWLdcb6PI6NVniosPsDMUM4ewEyMUFnu10O4i_bAuoDWSiOahA32znMqQjfpSRE6CTFwcIldK1-j7f-ayKDesAvlb3lzYa9Tl7uh1p0i2aocQmw7vmECS_ZwUWP9NRkx1iRP4GwiVFu3maYb9junG1TT1WQMEU-zgXxfxYWT3Z4e7cuWLc8fjNjf4EWkV14uOpYoIq71CtFx6LOXCH1Be5NICFQXB643mgpOqEXji61rqsQN_ZcjHRp33uherYj0WM5LCRCxRzm9uBkkD2g8AGMNXNXlU8dt69aNjQ6jsK9vIi2-nlE6zZiVHcdMMU79j5aeuMuooKBrRBhrKdlK8BI2ti2olv7PmVXJj3_YaUDhYEy3WeTjZZMZOPKnbdwP-jnOD9iZpnODSo5HK2A_7ngxrL_jUDeHUMCnBNzaz_jhR0CL05b9CoZ24Ks4_AL476WkBvNmtiT_yYKLQ%3D%3D&checksum=625782874)
 
 Click `Decrypt` to decrypt the message in ~1 minute.
 
@@ -43,8 +43,8 @@ end
 key = hash[1]
 
 for i = 2 to P
-  encrypted_seed[i] = encrypt(seed[i], key)
-  key = encrypt(hash[i], key)
+  encrypted_seed[i] = xor(seed[i], key)
+  key = xor(hash[i], key)
 end
 
 ciphertext = encrypt(plaintext, key)
@@ -55,15 +55,15 @@ Share `ciphertext`, `seed[1]`, and `encrypted_seed[]`.
 
 ### 🔓 Decryption
 
-![encryption](docs/images/decryption.webp)
+![decryption](docs/images/decryption.webp)
 
 ```lua
 key = slow_hash(seed[1])
 
 for i = 2 to P
-  seed = decrypt(encrypted_seed[i], key)
+  seed = xor(encrypted_seed[i], key)
   hash = slow_hash(seed)
-  key = decrypt(hash, key)
+  key = xor(hash, key)
 end
 
 plaintext = decrypt(ciphertext, key)
@@ -154,7 +154,7 @@ Without `p` and `i` in the salt, an attacker could compute `slow_hash` for the e
 
 With `p` and `i` mixed into the salt, this must be repeated for every distinct `(p, i)`, increasing the attacker’s work by a factor of `P * loop`.
 
-![decryption](docs/images/encryption-2.webp)
+![encryption](docs/images/encryption-2.webp)
 
 Because the final key is derived through a dependency chain (key4 depends on key3, which depends on key2, etc.), even though each seed is only 4 bytes, an attacker still cannot brute-force starting from the last seed alone; all seeds must be involved in the computation.
 

@@ -234,7 +234,7 @@ export async function start(
     xorBuf(key, hash, SIZE.HASH)
   }
 
-  const cipher = await aesEncrypt(plain, key, new Uint8Array(16))
+  const cipher = await aesEncrypt(plain, key, new Uint8Array(12))
   const output: DecryptParams = {
     cost,
     cipher,

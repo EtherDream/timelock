@@ -80,7 +80,7 @@ export async function start(
   }
 
   try {
-    return await aesDecrypt(params.cipher, key, new Uint8Array(16))
+    return await aesDecrypt(params.cipher, key, new Uint8Array(12))
   } catch {
   }
 }
