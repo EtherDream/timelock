@@ -1,7 +1,9 @@
 node_modules
 package-lock.json
-dist
+public/index.js
+public/index.js.map
 gh-pages
 .DS_Store
 .vscode
 .bak
+research

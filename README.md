@@ -1,170 +1,200 @@
-# Timelock
+# ⏳ Timelock
 
-A sender encrypts a message so that no one can decrypt it immediately; it can only be decrypted after a predetermined amount of time. Send information into the future.
+**Send a message into the future.** Encrypt it today, no one can read it until tomorrow — no server, no trust, just math and time.
 
-All data and algorithms are public; no servers are required.
+## ✨ Features
 
-## Demo
+- 🚀 **Near-native in the browser** — a short, register-only arithmetic core keeps WASM performance close to native
+- 🔐 **GPU-powered encryption** — WebGPU parallel computation
+- ⏱️ **Time-bound decryption** — sequential by design, with no known practical shortcut
 
-### 🔐 Encryption
+## 🌐 Demo
 
-https://etherdream.github.io/timelock/encrypt.html
+### 🔐 [Encrypt](https://etherdream.github.io/timelock/encrypt.html)
 
-`Cost` is the decryption cost, i.e. the approximate number of SHA-256 computations required during decryption. The unit is MHash. (1 MHash = 1,000,000 hashes)
+- **Cost**: total iterations required for decryption (in billions)
+- **GPUs**: number of GPU threads. More threads = faster encryption, but larger output
 
-`GPUs` is the number of GPU threads used during encryption. More threads can distribute the work and reduce encryption time, but more seeds need to be stored. (1 thread = 1 seed)
+> Requires WebGPU support.
 
-> Your browser must support WebGPU; otherwise encryption will not work.
+### 🔓 [Decrypt](https://etherdream.github.io/timelock/decrypt.html)
 
-### 🔓 Decryption
+Single-threaded, CPU-only. The wait is the point.
 
-https://etherdream.github.io/timelock/decrypt.html
+> Try it: [a sample message unlockable in ~1 minute](https://etherdream.github.io/timelock/decrypt.html#version=3&cost=10&ciphertext=NohbF-0z3BYZGwcCC_FFg2SEqbWKcmaLLV59uXJnTJQeIybdRvCHeur1zqlkIAs5hbObyqJIZcYdlLtd9T9SkErH&seedNum=64&seedData=qACr7lbMZdOiYHmwLa5jw-YCCPpAaWE0g8iUYFRpXjiouK1RMl9T1pbrQvpqJlu6Eqmd6jyvyRGFNPI69V-nmsTEISR1fguvrf0yCgu8Xm6XzjyeTQE2ymrwP1wQZ0lsPNds9STg2Dbp37vc7t90BhGV-NonhH3DJiFR8i2xLmruSWkukyjePR1eKrS_dCQteOir_21xNpA1wcdcTR87xF1TFFYfw02QHqpyyeavVKO9-ENW1B64LgkSPpKJYq4kYay__J6SxNCk9Qd9jsM1f9NuobHI1YuJHzHmxNHndgElcYHCAP0fNhjrwazIo2EApqDeH1GzYoyZgKBvsGvPZ7vQeFAawwDt03630ovf6i7iJPda8G3K6sQ-xE-7X-nO0JZSWFno_6tfcVbMUuxipA5vjp3qN-5c3lDCywMng10rgVBwhgmKb0X9xxhKCtrpexqd0_sDXKZX2wWaeoAqOFRcrD01hEgtF2JUcYT_jllZcu0PLlZETEaB1Aec1wenqLSuvtMoJu9zqHy6lQkdqeB1biITH1wslJu18BFSEMq28CUhFqskp6etJFZ7N5SmfAoftDGbMxv_koOoLql78wj8W_k62C7IuCiNZkXv_mYDpOvRRVuXAVM_WT1R_Az-s2zHkx8qXESeIPoSvl04sh4AMFz4y2siN9AKnDddKis%3D&constants=2246822507%2C3266489909%2C2654435769%2C668265263%2C3982152891%2C2890668881%2C3210233709%2C2496678331&iv=BMdUB1o0btko4t8i&checksum=1224452476).
 
-Decryption is inherently single-threaded and runs on the CPU.
+## 📊 Performance
 
-[Decryption Test](https://etherdream.github.io/timelock/decrypt.html#version=2&cost=1000&salt=Q3OHRL0_1QILGjJqksF40g%3D%3D&cipher=yCyGJXWWy1ogKX3phWPmch0d1xOO7-ZfvQzoyFB3m9VcsGtqeYmL0XNrJd9PibB3NPLl5i_Y5XKG7H1RMzUUSjJ-6_K2N_kivk_YhC5UpvOo3cgFjA%3D%3D&seedLen=4&seedNum=512&seeds=sIVHmkGF5t5LvJalb7TloAIW-oVteu8c5rLLJ15QH2brHTyJFn0jYO5wT23KMfpo1RuxG-IFYyPQL-WXt1gjPzW_TdK0sX6pX3ik0KZm5edH9ZT2YIMPnrlWyclxVcH3cqdqcS-g7-ahKOJkORQGsbmV88b0G1ACMx9fQ_bm2TEv40VTY-_4s4xlmlJ339cj8JaU_qmvfKrBN1JXXyJq4HhNGxqb26dqHbYW5OLGmN96eQMFUoPLEdEcslwEk-l1FeXpTQl-kqBBWHL9XXvgQS4asQlnFhK0dVFJeUljv6P7sEF7fHh4z8SVxSHVgKBXspkct6FL61z1NX6xUOgV8fsF0iBw46iinwzst0zt9GfKm7wqcbybipLxDuhiaWdPxCYX3tzCIjUzDOI_0twtNrXAat50j1ss6zSPNJC5SR-nY7hF7PcQEAgRHoVFPcF50Ihm3AeOx933lzKXYi0CnVTZlFm2Xx7o9OzSwAFq6LWaiPxuljgfJy-rRkdp575Ss_QymYkR7bsziV8dS54PXOX_MdSLSHtD3y8SskyMxlxUjcbXoaZGUMRzKvh_3758O44tHdVFSrJHCVw8hcr0xVGXlFbKn0rBkOZ1FmyYWjeUdL3iblUGLsWoaIA8zK3J2NrUZ-H4cpLoV5GKtqCCK34UCdj6BO80Pk8RHEDzexx7K5umgWvNDP3bZ2ONjAOS7VwbKxzBahwPmnXEGDpCu1aKLHsOQsrARg1eBSd5JaL7oJhJF-6foP4bwK1wYD1RdPbzdxUW0mtm-uTTWJzZ8v-SuOUbXGSQ1jVL9Y3_eCG4pAhNMj4Hy16j1yhOq55359n5MNWrj8q8Emky08Vh61TqkDrMLpmjBHCrR6LU6WaJFWU1hiwLzEVG_Z7jpXRN0fPFlQvR_XZFkhF3F1_aMiwEQ6GgValjyrRFBbJGZZWASiNW99CYBiIE7B7twQHU34LEjUzeXcATfOpEuLn2DEwrjYshL97-6eCmInydm3a66KSRzoyn3WiqRAhYfD5jEVYAGHArevZY4ue0ZdSGN2hZ9-y9d5kknhqvigEK8EJDXyUIvZUHo-7LR9Oa8vF5a_tmPj465szqePcMMTO3KwZXKFJSnjgjMD-gGsZvh3Ex4w3WZVLzlXl36T-BGBlbU5RMLwGhQf-XDW0Fza6eV_NodSut6gozi90VL9pFQKSmR2c3KcpVfBOsHo7b5GbrEZi62snSPtLE3JoEDJ8fPKJwmKPSfUoy7767tM3tfJ8NWWQXCAcCDwVLFaSJ0-0nHCKj88jhPgK7g996K9xvliOsDdgRhdwZKqbp98QOXEfYREazbMYqAl3jNMr4UEmSQEBNxOYjq6niKXCGanb0_j0DkjJJrRmSzD-_feLwAMJ0jyUVcbTO5QCWtGIvTH3VX36SqTHsrRWBqKwZmiTefoVI8Wj5mymQZju-mJ013yki1lw-QMcycn4DSwVmywuhWaBCw-9Pr-05Y262F8hEjssVtgP_pOv0tM8-_baDRR7YO22NE6NQtDdbS35IJj8UFX__qmb32_VcttL6w3HzeaT8QTllPymVCe98DQmGFNW2lJe5vBf6VeTym2_Y2icCrSRPOMNSRfLbc2Ulm8mCL-_2fNfbc3lHbt_V6RR9eyNrTQbrcz2k5WSb0G3eQB4l_Ei1vxFGDjcGAFvw4oE99UgNWe3CS6ostTqBqEONDQlQBus_KHq9uxzVzKv5UGf4Nu0POF2ztFuSasLfSwo-9AU3hUwoaYkvZ-4ISS9q5YgXDTMoxt_cEWDo8wbXfi5xFRxJsIcJyn_QrlpUhercYzZ272KhOaL6IxsafPvEracdUta8IjSYFu1yn5rugDCN7PbPunpw7ghrG_PBenAN683tuaYL6AybQWDJ-ZWw1y4PCMRpbYOmu7WAglylPJ8H-GCldSzmxxqq4foSeK4JwguZN_g2t-q7d2eUwP2PmUMeuT48X58SAdsqrycsqIC3ADyv_V6qTSkNXiVum3vkYqmwx2c316ZULaFK4fD9CDZfp7ymNDUpKV9R0G4wmBGuX9eqC-vNGVnpMXZSXK3P0_lKI2my__e53REz8EG_3OL1S7HroQOu2Mzz8GOwAUWBxFcyR_2BcA5Au4k983CmvTcJ9uB91T0QeEK5vju3qB0-SC2gZzmuT-PQAHw_1RsPp-gqDxtgFIkMivfYYS3-LWR5y4qvD1Ax6cGuynwv5g_EaR5-nHHeR7rLEtuuW_8XF7JDeWP39RDKS_da6aVzB5EKhUwRj2yY1KJEy1Q-7TlPqdf75tQ7zFQ_pTKTa3YMuCeZ5KISZwHksctrh0S58ZxYu3zGVDyAxo6B4KSiqa233dtMDxiZc_NT-G26mRrXVgCjUHfjemZaDRkBmZSM_MElEIqY97NV_mw5Tv-9K04DHINsRPaYl6UvKc_mFevqEMq2v3Pzdf4rz9qjgFiGQwn5YUwgRtun_J2eUpuBuZ9PNo-oE23O8B_6JWzdI8qts6N2s3_XSKD6ITECna-TrYcoXY7MFZAQzsQYf6gZIxOKgp-_vkuDM_RKwaxpFIET2EpOvCkuQR7CxQzHDS0ropvxIdwvzi3JZbR5DYWpKKiOA3yxNz3X-bTT0pkSS3ISqYMtZEhWYhfImNNLW6ual3WbTd6oM0Zk626x7r2Jz5o3cxHuKhSBewjDQHhEChHshQKZ0EFSAx3mhgTDBEw7qXRJwTthjMHFUSGznYsmGsc%3D&checksum=2098817500)
+|             Device                  | Encrypt (GPU) | Decrypt (CPU)  | Ratio       |
+|-------------------------------------|---------------|----------------|-------------|
+| MacBook Pro M1 (3.2 GHz)            | ~65 GH/s      | ~100 MH/s      | **~600×**   |
+| GTX 1660 Ti / i5-9600K (4.6 GHz)    | ~190 GH/s     | ~140 MH/s      | **~1000×**  |
+| RTX 5090 / i9-14900K (5.8 GHz)      | ~4 TH/s       | ~180 MH/s      | **~20000×** |
 
-Click `Decrypt` to decrypt the message in ~1 minute.
+> Example: 5s encrypt → ~1 day decrypt
 
-## How it works
+## ⚖️ Why Not RSA?
 
-### 🔐 Encryption
+Rivest, Shamir, and Wagner proposed an [RSA-based time-lock](https://people.csail.mit.edu/rivest/pubs/RSW96.pdf) decades ago. It's theoretically elegant but relies on big-integer modular exponentiation.
+
+In the browser, big-integer modular exponentiation runs **~3× slower** than hand-optimized native libraries like GMP, which use assembly-level techniques (ADX/MULX, unrolled Montgomery multiplication) that browsers cannot match. An impatient user would simply use a native program to decrypt faster, defeating the purpose of a browser-based tool.
+
+The same issue extends to hardware: big-integer arithmetic benefits much more from FPGA or ASIC acceleration, creating more room for specialized implementations to pull ahead.
+
+**This project takes a different approach**: the algorithm uses only 32-bit multiply and XOR — simple operations in a very short, register-only hot loop, allowing WASM performance to stay close to native. This greatly reduces the incentive to leave the browser, and likely also limits the advantage of specialized hardware. **The trade-off is that encryption is no longer cheap: it requires about as much total computation as decryption, but parallelizes well on GPUs.**
+
+| | RSA time-lock | This project |
+|---|---|---|
+| Encryption cost | $O(\log n)$ — very cheap | $O(n)$ — needs GPU parallelism |
+| Browser decryption | ~3× slower than native | **≈ native speed** |
+
+## ⚙️ How It Works
+
+### Encryption
+
+The GPU computes `slow_hash` for all seeds in parallel, then chains the results to encrypt each subsequent seed. The final key is used to encrypt the plaintext.
 
 ![encryption](docs/images/encryption.webp)
 
 ```lua
-seed[] = random_bytes()
+seed[1 .. P] = random_data()
 
--- parallel (GPU) --
+-- parallel --
 for i = 1 to P
-  hash[i] = slow_hash(seed[i])
-end
+  hash[i] = slow_hash(seed[i], cost / P)
 
+-- chain --
 key = hash[1]
 
 for i = 2 to P
-  encrypted_seed[i] = xor(seed[i], key)
-  key = xor(hash[i], key)
-end
+  encrypted_seed[i] = seed[i] XOR key
+  key = key XOR hash[i]
 
 ciphertext = encrypt(plaintext, key)
 ```
 
-Share `ciphertext`, `seed[1]`, and `encrypted_seed[]`.
+Share `seed[1]`, `encrypted_seed[2..P]`, and `ciphertext`.
 
 
-### 🔓 Decryption
+### Decryption
 
 ![decryption](docs/images/decryption.webp)
 
 ```lua
-key = slow_hash(seed[1])
+key = slow_hash(seed[1], cost / P)
 
 for i = 2 to P
-  seed = xor(encrypted_seed[i], key)
-  hash = slow_hash(seed)
-  key = xor(hash, key)
-end
+  seed[i] = encrypted_seed[i] XOR key
+  hash[i] = slow_hash(seed[i], cost / P)
+  key = key XOR hash[i]
 
 plaintext = decrypt(ciphertext, key)
 ```
 
-Because each step depends on the previous output, decryption cannot be parallelized and must run sequentially.
+Starting from `seed[1]`, each subsequent seed must be recovered using the current key, then hashed to derive the next one. This makes decryption sequential by construction.
 
-## Why use slow hash
+## 🔁 The slow_hash
 
-For time-lock puzzles, using a slow hash is not ideal because encryption requires roughly the same amount of work as decryption — although encryption can be sped up via parallelism.
+A simple multiplication-based delay function:
 
-A good time-lock scheme should make encryption much cheaper than decryption. For example, Rivest, Shamir, and Wagner described an RSA-based time-lock decades ago in [this paper](https://people.csail.mit.edu/rivest/pubs/RSW96.pdf). Such schemes can be implemented in the browser, but they typically run less efficiently than native code due to VM overhead. An impatient receiver doesn’t have to decrypt in the browser — using a native program can finish earlier.
+```c
+// Default values selected from well-known PRNG/hash constants.
+const uint32_t C1 = 0x85EBCA6B;  // MurmurHash3
+const uint32_t C2 = 0xC2B2AE35;  // MurmurHash3
+const uint32_t C3 = 0x9E3779B9;  // xxHash
+const uint32_t C4 = 0x27D4EB2F;  // xxHash
+const uint32_t C5 = 0xED5AD4BB;  // lowbias32
+const uint32_t C6 = 0xAC4C1B51;  // lowbias32
+const uint32_t C7 = 0xBF58476D;  // SplitMix
+const uint32_t C8 = 0x94D049BB;  // SplitMix
 
-Browsers, however, natively support slow hash algorithms via WebCrypto PBKDF2. Using this API helps narrow the performance gap between browser and native environments. This makes encryption heavier for the sender, but it doesn’t affect the receiver.
+uint64_t slow_hash(uint64_t seed, int n) {
+  uint32_t a = seed;
+  uint32_t b = seed >> 32;
 
-<details>
-<summary>What’s PBKDF2?</summary>
-PBKDF2 is a wrapper around a PRF (here HMAC-SHA256) that repeats it for a configurable number of iterations, roughly:
+  for (int i = 0; i < n; i++) {
+    a *= C1; b ^= a;
+    b *= C2; a ^= b;
 
-```lua
-function pbkdf2(password, salt, iter)
-  hash = hmac_sha256(password, salt)
+    a *= C3; b ^= a;
+    b *= C4; a ^= b;
 
-  for i = 2 to iter
-    hash = hmac_sha256(hash, ...)
-  end
-  return hash
-end
-```
-</details>
+    a *= C5; b ^= a;
+    b *= C6; a ^= b;
 
-## About slow hash
-
-WebCrypto PBKDF2 does not provide progress reporting, and the iteration count is bounded (up to 2<sup>32</sup>). To work around this, we split a large target iteration count into multiple smaller PBKDF2 calls:
-
-```lua
-function slow_hash(seed, iter)
-  loop = iter / small_iter
-  hash = seed
-
-  for i = 1 to loop
-    hash = pbkdf2_sha256(hash, salt, small_iter)
-  end
-  return hash
-end
-```
-
-In this project, small_iter is up to `20,000,000`, which takes about 1 second on a recent desktop CPU.
-
-<details>
-<summary>Test</summary>
-
-```js
-const opt = {
-  name: 'PBKDF2',
-  hash: 'SHA-256',
-  salt: crypto.getRandomValues(new Uint8Array(16)),
-  iterations: 2e7
+    a *= C7; b ^= a;
+    b *= C8; a ^= b;
+  }
+  return (uint64_t)b << 32 | a;
 }
-const key = await crypto.subtle.importKey(
-  'raw', Uint8Array.of(0), 'PBKDF2', false, ['deriveBits']
-)
-console.time('time')
-await crypto.subtle.deriveBits(opt, key, 256)
-console.timeEnd('time')
 ```
-</details>
+Strictly speaking, this is a **permutation**, not a hash — it has no compression and is invertible. An [earlier version](https://github.com/EtherDream/timelock/tree/pbkdf2) used WebCrypto PBKDF2-SHA256 as the slow hash. While conservative and well-studied, it has practical drawbacks for time-lock use:
 
-## About security
+- Browser implementations vary significantly in speed (Chrome is ~2× faster than Safari)
+- Native libraries like [fastpbkdf2](https://github.com/ctz/fastpbkdf2) outperform even the fastest browser by ~10%
+- CPUs with hardware acceleration (e.g. SHA-NI, ARMv8 Crypto Extensions) gain an unfair advantage over those without
 
-Because `slow_hash` is intentionally expensive, using parallelism to brute-force the seed space as a shortcut around the sequential decryption work is impractical. This allows us to use shorter seeds to reduce the output size; in this project, each seed is 4 bytes by default, and all seeds share a single 16-byte random salt.
+The current approach reduces these gaps: it uses only very simple operations, leaving relatively little room for platform-specific optimization.
 
-To further harden the design, we incorporate the seed index `p` and the loop index `i` into the salt used by PBKDF2, making precomputation significantly harder.
+Additionally, its simplicity makes it highly efficient on GPU, yielding a much higher GPU-encrypt / CPU-decrypt speed ratio than PBKDF2.
 
-```lua
-function slow_hash(seed, iter, p)
-  loop = iter / small_iter
-  hash = seed
+### Why use MUL-XOR as a delay function?
 
-  for i = 1 to loop
-    hash = pbkdf2_sha256(hash, salt || p || i, small_iter)
-  end
-  return hash
-end
+Multiplication tends to mix bits more aggressively than addition or rotation, and for a delay function, a heavier primitive is a feature rather than a drawback.
+
+But strong mixing alone is not enough — a delay function must also resist shortcut evaluation, with no known way to compute $f^n(x)$ significantly faster than iterating $f$ one step at a time.
+
+- ❌ **Pure multiplication**: $f^n(x) = x \cdot C^n \bmod 2^{32}$, where $C^n$ is computable in $O(\log n)$ via fast exponentiation — unsuitable for a delay function.
+- ❌ **Affine recurrences** (such as LCGs) are similarly reducible via a closed-form expression over $\mathbb{Z}/2^{32}\mathbb{Z}$.
+- 🧩 **Alternating MUL and XOR** mixes operations from different algebraic structures: multiplication propagates carries across bit positions (ring $\mathbb{Z}/2^{32}\mathbb{Z}$), while XOR acts independently on each bit over $\mathrm{GF}(2)^{32}$. This disrupts the simple algebraic structure that makes purely multiplicative or affine recurrences easy to shortcut.
+
+> This is design intuition, not a proof of sequential hardness.
+
+### Implementation Note
+
+Since `slow_hash` outputs only 64 bits, the final key has limited entropy. The actual implementation derives the AES key as `sha256(hash[1..P])`, producing a 256-bit key suitable for AES.
+
+### Why not 64-bit multiplications?
+
+The current `slow_hash` uses two 32-bit state variables with 32-bit multiplications internally. A variant using a single 64-bit state with 64-bit multiplications would offer stronger ASIC resistance:
+
+```c
+uint64_t slow_hash_64(uint64_t seed, int n) {
+  while (n--) {
+    seed *= 0xD1342543DE82EF95ULL;
+    seed ^= seed >> 32;
+
+    // ...
+  }
+  return seed;
+}
 ```
 
-Without `p` and `i` in the salt, an attacker could compute `slow_hash` for the entire seed space in parallel for a fixed salt, which could turn the sequential decryption work into a large offline precomputation.
+On many modern CPUs, 32-bit and 64-bit integer multiplications have similar latency and often use the same underlying hardware path. However, a 32-bit multiplier has a shorter critical path in silicon, meaning a custom ASIC could clock 32-bit multiply faster — a potential advantage for attackers.
 
-With `p` and `i` mixed into the salt, this must be repeated for every distinct `(p, i)`, increasing the attacker’s work by a factor of `P * loop`.
+The trade-off is on the **encryption side**: GPU ALUs are natively 32-bit. Emulating 64-bit multiplication in a shader significantly reduces encryption throughput. Since this project relies on GPU parallelism to make encryption fast, 32-bit is the pragmatic choice — it maximizes the encrypt/decrypt time ratio that makes the time-lock effective.
 
-![encryption](docs/images/encryption-2.webp)
+### Custom Constants
 
-Because the final key is derived through a dependency chain (key4 depends on key3, which depends on key2, etc.), even though each seed is only 4 bytes, an attacker still cannot brute-force starting from the last seed alone; all seeds must be involved in the computation.
+You can override the default constants by setting `CONSTANTS` in the browser console before encrypting. They are included in the output, so decryption works automatically.
 
-> To use longer seeds, modify `SEED_LEN` in the browser console.
+Constants are inlined into both WebGPU shader and WASM bytecode at runtime — zero overhead compared to hardcoded values.
 
+### Roadmap
 
-## When to use
+Beyond constants, future versions may support **randomized programs** — varying instruction sequences (e.g. bitwise rotations, shifts). Similar to [RandomX](https://github.com/tevador/RandomX)'s approach, this makes the algorithm itself non-fixed, increasing the difficulty of analysis and specialized hardware optimization.
 
-* CPU/GPU performance benchmarks.
+## ⚠️ Caveats
 
-* Posting a CPU race on social media: the first person to unlock it gets a coupon link. Competing on hardware is more interesting than competing on luck.
+This is an experimental time-lock construction, not a formally proven delay function. Unlike RSA-based time-locks, which are tied to well-studied number-theoretic assumptions, the sequential hardness here is heuristic.
 
-* Temporarily locking an account (e.g., storing a wallet key in a time capsule).
+The design is intended to avoid obvious shortcut structures, but no theorem rules out deeper attacks. No practical shortcut is currently known, but none has been proven impossible either.
+
+Custom hardware may achieve constant-factor speedups, and real-world performance varies by CPU microarchitecture and implementation. Unlock times should therefore be treated as approximate rather than exact.
+
+## 🕹️ Use Cases
+
+- ⏰ **Time capsule** — lock a message until a specific date
+- 🏁 **CPU race** — first to decrypt wins a prize (compete on hardware, not luck)
+- 🔑 **Delayed key release** — publish encrypted content now, key unlocks later
+- 📊 **Hardware benchmark** — measure your CPU and GPU performance

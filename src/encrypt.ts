@@ -1,57 +1,30 @@
 import SHADER from './assets/shader.wgsl'
-import * as wasm from './wasm'
 
 import {
-  SIZE,
-  MAX_ITER_PER_PBKDF2,
   DecryptParams,
   EncryptParams,
-
   aesEncrypt,
   fillRandomBytes,
-  getBlockByIndex,
-  // cloneBuf,
-  xorBuf,
 } from './util'
 
-
-async function getGpuDevice() {
-  const adapter = await navigator.gpu.requestAdapter({
-    powerPreference: 'high-performance',
-  })
-  if (adapter) {
-    const device = await adapter.requestDevice()
-    return device
-  }
-}
-
-export async function init() {
-  const device = await getGpuDevice()
-  if (!device) {
-    return false
-  }
-  wasm.init()
-  return true
-}
-
-/** @workgroup_size() in shader.wgsl */
 const WORKGROUP_SIZE = 64
 
-export async function start(
-  params: EncryptParams,
-  onProgress: (percent: number, hashPerSec: number) => void
-) {
-  const plain = params.plain
-  const cost = params.cost
-  const seedLen = params.seedLen
-  let thread = params.thread
+const IS_MOBILE = /Mobi|Android/i.test(navigator.userAgent)
+const MAX_DISPATCH_MS = IS_MOBILE ? 200 : 1000
 
-  if (cost < 1) {
+
+/** total iterations per second (H/s) */
+export let speed = 0
+export let percent = 0
+
+export async function start(params: EncryptParams) {
+  const plaintext = params.plaintext
+  const cost = BigInt(params.cost) * 1000000000n
+  if (cost < 1n) {
     throw Error('cost must be >= 1')
   }
-  if (seedLen <= 0 || seedLen > 32) {
-    throw Error('seedLen must in [1, 32]')
-  }
+
+  let thread = params.thread
   if (thread < WORKGROUP_SIZE) {
     thread = WORKGROUP_SIZE
   }
@@ -63,185 +36,221 @@ export async function start(
     console.log('thread rounded up to:', thread)
   }
 
-  const workgroupNum = thread / WORKGROUP_SIZE
+  const seeds = new BigUint64Array(thread)
+  fillRandomBytes(seeds.buffer)
 
-  const startCtxBuf = wasm.getStartCtxBuf(thread)
-  const ctxWBuf = wasm.getCtxWBuf(thread)
-  const ctxRBuf = wasm.getCtxRBuf(thread)
-  const ioBuf = wasm.getIoBuf(thread)
-
-  const salt = wasm.getSaltBuf()
-  fillRandomBytes(salt)
-
-  const seeds = new Uint8Array(thread * seedLen)
-  fillRandomBytes(seeds)
-
-  ioBuf.set(seeds)
+  // Degenerate seeds (0, 0x80000000_00000000, 0x00000000_80000000, 0x80000000_80000000)
+  // have short cycles, but the probability is 4/2^64. A degenerate seed
+  // only breaks sequential hardness for its own slow_hash output and does
+  // not weaken the chain and the final AES key.
 
   const gpu = await getGpuDevice()
   if (!gpu) {
-    return
+    throw Error('WebGPU is not available')
   }
   gpu.addEventListener('uncapturederror', e => {
-    // console.warn(e.error.message)
+    console.warn(e.error.message)
   })
 
-  const module = gpu.createShaderModule({
-    code: SHADER,
-  })
+  const constants = params.constants
+  const code = SHADER
+    .replace(/__C(\d+)__/g, (_, i) => constants[+i - 1] + '')
+    .replace('__WORKGROUP_SIZE__', WORKGROUP_SIZE + '')
+
+  const module = gpu.createShaderModule({code})
   await module.getCompilationInfo()
 
   const pipeline = gpu.createComputePipeline({
     layout: 'auto',
     compute: {
       module,
-    }
+    },
   })
 
-  // input params
-  // (read-only, aligned to 16 bytes)
+  // input params (aligned to 16 bytes)
   const enum ID {
-    STEP,
+    ITERATIONS,
   }
   const uniformParams = new Uint32Array(4)
 
-  const gpuUniformParams = gpu.createBuffer({
+  const uniformParamsBuffer = gpu.createBuffer({
     size: uniformParams.byteLength,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   })
 
-  // start_ctx.inner.state and start_ctx.outer.state
-  // (read-only)
-  const gpuStartCtx = gpu.createBuffer({
-    size: startCtxBuf.byteLength,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  })
-
-  // sha256 words
-  const gpuCtxW = gpu.createBuffer({
-    size: ctxWBuf.byteLength,
+  const seedBuffer = gpu.createBuffer({
+    size: seeds.byteLength,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
   })
+  const hashReadback = gpu.createBuffer({
+    size: seeds.byteLength,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+  })
 
-  // result
-  const gpuCtxR = gpu.createBuffer({
-    size: ctxRBuf.byteLength,
+  const countBuffer = gpu.createBuffer({
+    size: thread * 4,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+  })
+  const countReadback = gpu.createBuffer({
+    size: thread * 4,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
   })
 
   const bindGroup = gpu.createBindGroup({
     layout: pipeline.getBindGroupLayout(0),
     entries: [
-      { binding: 0, resource: { buffer: gpuUniformParams } },
-      { binding: 1, resource: { buffer: gpuStartCtx } },
-      { binding: 2, resource: { buffer: gpuCtxW } },
-      { binding: 3, resource: { buffer: gpuCtxR } },
+      { binding: 0, resource: { buffer: uniformParamsBuffer } },
+      { binding: 1, resource: { buffer: seedBuffer } },
+      { binding: 2, resource: { buffer: countBuffer } },
     ],
   })
-  const readbackGpuBuf = gpu.createBuffer({
-    size: ctxRBuf.byteLength,
-    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-  })
+  gpu.queue.writeBuffer(seedBuffer, 0, seeds)
 
-  // 1 cost = 1M Hash
-  const hashNum = cost * 1e6
 
-  // PBKDF2 performs SHA256 twice in each iteration
-  const iterTotal = hashNum / 2
+  const costPerThread = Number(cost / BigInt(thread))
+  let remaining = costPerThread
+  let iterationsPerBatch = 1e4
+  let lastRate = 0
+  let dispatchCount = 0
 
-  // number of iterations required per seed
-  const iterMax = Math.ceil(iterTotal / thread)
+  while (remaining > 0) {
+    dispatchCount++
+    uniformParams[ID.ITERATIONS] = Math.min(iterationsPerBatch, remaining)
+    gpu.queue.writeBuffer(uniformParamsBuffer, 0, uniformParams)
 
-  // number of iterations completed per seed
-  let iterCur = 0
- 
-  // iteration step of each GPU execution
-  let step = 500
+    const cmd = gpu.createCommandEncoder()
+    const pass = cmd.beginComputePass()
+    pass.setPipeline(pipeline)
+    pass.setBindGroup(0, bindGroup)
+    pass.dispatchWorkgroups(thread / WORKGROUP_SIZE)
+    pass.end()
+    gpu.queue.submit([cmd.finish()])
 
-  const pbkdf2Times = Math.ceil(iterMax / MAX_ITER_PER_PBKDF2)
-  const pbkdf2Iter = Math.ceil(iterMax / pbkdf2Times)
+    const t0 = performance.now()
+    await gpu.queue.onSubmittedWorkDone()
+    const t1 = performance.now()
 
-  let seq = 0
-  wasm.pbkdf2Pre(thread, seedLen, seq)
+    const elapsedMs = Math.max(t1 - t0, 0.01)
+    const currentRate = elapsedMs / iterationsPerBatch
 
-  for (seq = 1; seq <= pbkdf2Times; seq++) {
-    let remainPbkdf2Iter = pbkdf2Iter
-
-    gpu.queue.writeBuffer(gpuStartCtx, 0, startCtxBuf)
-    gpu.queue.writeBuffer(gpuCtxW, 0, ctxWBuf)
-    gpu.queue.writeBuffer(gpuCtxR, 0, ctxRBuf)
-
-    // Split a single PBKDF2 into multiple calls to
-    // prevent a single call from taking too long on the GPU.
-    do {
-      if (step > remainPbkdf2Iter) {
-        step = remainPbkdf2Iter
+    // detect GPU timeout: verify all threads completed expected dispatch count
+    if (currentRate < lastRate * 0.3) {
+      const completed = await readDispatchCounts(gpu, countBuffer, countReadback, thread, dispatchCount)
+      if (completed < thread) {
+        if (completed >= 0) {
+          const failedCount = thread - completed
+          console.warn(`GPU timeout: ${failedCount} threads incomplete at dispatch ${dispatchCount}`)
+        }
+        break
       }
-      // 1x iter => 2x hash
-      uniformParams[ID.STEP] = step * 2
-      gpu.queue.writeBuffer(gpuUniformParams, 0, uniformParams)
-
-      const cmd = gpu.createCommandEncoder()
-      const pass = cmd.beginComputePass()
-      pass.setPipeline(pipeline)
-      pass.setBindGroup(0, bindGroup)
-      pass.dispatchWorkgroups(workgroupNum)
-      pass.end()
-
-      cmd.copyBufferToBuffer(gpuCtxR, 0, readbackGpuBuf, 0, readbackGpuBuf.size)
-      gpu.queue.submit([cmd.finish()])
-
-      const t0 = performance.now()
-      await gpu.queue.onSubmittedWorkDone()
-      const t1 = performance.now()
-
-      remainPbkdf2Iter -= step
-      iterCur += step
-
-      // update step to keep each call takes ~1s
-      const stepPerMs = step / Math.max(t1 - t0, 0.01)
-      step = Math.ceil(stepPerMs * 1000)
-
-      onProgress(iterCur / iterMax, step * thread * 2)
-    } while (remainPbkdf2Iter)
-
-
-    await readbackGpuBuf.mapAsync(GPUMapMode.READ)
-    const readbackJsBuf = readbackGpuBuf.getMappedRange()
-  
-    ctxRBuf.set(new Uint8Array(readbackJsBuf))
-    readbackGpuBuf.unmap()
-
-    wasm.pbkdf2Post(thread)
-
-    if (seq < pbkdf2Times) {
-      // output as next input
-      wasm.pbkdf2Pre(thread, SIZE.HASH, seq)
     }
-  }
-  gpu.destroy()
+    lastRate = currentRate
 
-  //
-  // encrypt seeds and generate key
-  //
-  const key = new Uint8Array(SIZE.HASH)
+    remaining -= iterationsPerBatch
+    percent = 1 - remaining / costPerThread
+
+    const threadRate = iterationsPerBatch / elapsedMs
+
+    // grow batch size: double, but never exceed the GPU watchdog time limit
+    const maxByTime = Math.ceil(threadRate * MAX_DISPATCH_MS)
+    const maxByGrowth = iterationsPerBatch * 2
+
+    iterationsPerBatch = Math.min(maxByTime, maxByGrowth, 1e8)
+
+    // update property for UI display
+    speed = threadRate * thread * 1000
+  }
+
+  // verify all batches completed
+  const finalCompleted = await readDispatchCounts(gpu, countBuffer, countReadback, thread, dispatchCount)
+  if (finalCompleted < thread) {
+    throw Error('GPU computation incomplete. Try reducing thread count.')
+  }
+
+  const cmd = gpu.createCommandEncoder()
+  cmd.copyBufferToBuffer(seedBuffer, 0, hashReadback, 0, hashReadback.size)
+  gpu.queue.submit([cmd.finish()])
+
+  await hashReadback.mapAsync(GPUMapMode.READ)
+  const hashes = new BigUint64Array(hashReadback.getMappedRange())
+
+  // encrypt original seeds using hashes
+  let key = 0n
 
   for (let p = 0; p < thread; p++) {
-    const seed = getBlockByIndex(seeds, seedLen, p)
-    xorBuf(seed, key, seedLen)
-
-    const hash = getBlockByIndex(ioBuf, SIZE.HASH, p)
-    xorBuf(key, hash, SIZE.HASH)
+    seeds[p] ^= key
+    key ^= hashes[p]
   }
 
-  const cipher = await aesEncrypt(plain, key, new Uint8Array(12))
+  // Each slow_hash output is 64 bits, insufficient for AES-256's 256-bit key.
+  // SHA-256 aggregates all hash outputs into a single 256-bit key, ensuring
+  // every hash contributes to the final key material.
+  const aesKey = await crypto.subtle.digest('SHA-256', hashes)
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const ciphertext = await aesEncrypt(plaintext, aesKey, iv)
+
+  percent = 1
+
+  hashReadback.unmap()
+  gpu.destroy()
+
   const output: DecryptParams = {
-    cost,
-    cipher,
-    salt,
+    cost: params.cost,
     seedNum: thread,
-    seedLen,
-    seeds,
+    seedData: new Uint8Array(seeds.buffer),
+    ciphertext,
+    iv,
+    constants: constants.slice(0),
   }
   return output
+}
+
+export async function init() {
+  const device = await getGpuDevice()
+  if (!device) {
+    return false
+  }
+  return true
+}
+
+async function getGpuDevice() {
+  const adapter = await navigator.gpu.requestAdapter({
+    powerPreference: 'high-performance',
+  })
+  if (adapter) {
+    const device = await adapter.requestDevice()
+    return device
+  }
+}
+
+/**
+ * Read per-thread dispatch counts from GPU and return the number of threads
+ * that match the expected count. Returns -1 on I/O failure.
+ */
+async function readDispatchCounts(
+  gpu: GPUDevice,
+  countBuffer: GPUBuffer,
+  countReadback: GPUBuffer,
+  threadCount: number,
+  expected: number,
+) {
+  try {
+    const cmd = gpu.createCommandEncoder()
+    cmd.copyBufferToBuffer(countBuffer, 0, countReadback, 0, threadCount * 4)
+    gpu.queue.submit([cmd.finish()])
+
+    await countReadback.mapAsync(GPUMapMode.READ)
+    const counts = new Uint32Array(countReadback.getMappedRange())
+
+    let completed = 0
+    for (let i = 0; i < threadCount; i++) {
+      if (counts[i] === expected) {
+        completed++
+      }
+    }
+    countReadback.unmap()
+    return completed
+  } catch {
+    return -1
+  }
 }

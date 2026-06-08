@@ -1,6 +1,6 @@
 {
   "name": "timelock",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "description": "time-lock puzzles for browsers",
   "scripts": {
     "dev": "webpack --mode development -w",
@@ -10,23 +10,17 @@
   "bugs": {
     "url": "https://github.com/EtherDream/timelock/issues"
   },
-  "keywords": [
-    "timelock",
-    "crypto",
-    "pbkdf2"
-  ],
   "type": "module",
-  "main": "dist/timelock.js",
+  "main": "public/index.js",
   "files": [
-    "dist",
-    "src"
+    "public/index.js"
   ],
   "author": "EtherDream",
   "license": "MIT",
   "devDependencies": {
     "@webgpu/types": "^0.1.69",
     "ts-loader": "^9.5.4",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "webpack": "^5.105.1",
     "webpack-cli": "^6.0.1"
   }

@@ -1,64 +1,46 @@
-export const enum SIZE {
-  HASH = 32,
-  SALT = 16,
-}
-
-// ~1 second
-export const MAX_ITER_PER_PBKDF2 = 2e7
-
-
 export type EncryptParams = {
-  plain: Uint8Array<ArrayBuffer>
+  plaintext: Uint8Array<ArrayBuffer>
   cost: number
-  seedLen: number
   thread: number
+  constants: Uint32Array
 }
 
 export type DecryptParams = {
   cost: number
-  cipher: Uint8Array<ArrayBuffer>
-  salt: Uint8Array<ArrayBuffer>
+  ciphertext: Uint8Array<ArrayBuffer>
   seedNum: number
-  seedLen: number
-  seeds: Uint8Array<ArrayBuffer>
+  seedData: Uint8Array<ArrayBuffer>
+  constants: Uint32Array
+  iv: Uint8Array<ArrayBuffer>
 }
 
 export async function aesEncrypt(
-  plain: Uint8Array<ArrayBuffer>,
-  key: Uint8Array<ArrayBuffer>,
-  iv: Uint8Array<ArrayBuffer>
+  plaintext: BufferSource,
+  key: BufferSource,
+  iv: BufferSource
 ) {
   const k = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt'])
-  const buf = await crypto.subtle.encrypt({name: 'AES-GCM', iv}, k, plain)
+  const buf = await crypto.subtle.encrypt({name: 'AES-GCM', iv}, k, plaintext)
   return new Uint8Array(buf)
 }
 
 export async function aesDecrypt(
-  cipher: Uint8Array<ArrayBuffer>,
-  key: Uint8Array<ArrayBuffer>,
-  iv: Uint8Array<ArrayBuffer>
+  ciphertext: BufferSource,
+  key: BufferSource,
+  iv: BufferSource
 ) {
   const k = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['decrypt'])
-  const buf = await crypto.subtle.decrypt({name: 'AES-GCM', iv}, k, cipher)
+  const buf = await crypto.subtle.decrypt({name: 'AES-GCM', iv}, k, ciphertext)
   return new Uint8Array(buf)
 }
 
-export function fillRandomBytes(buf: Uint8Array) {
-  for (let i = 0; i < buf.length; i += 65536) {
-    const slice = buf.subarray(i, i + 65536)
+export function fillRandomBytes(buf: ArrayBuffer) {
+  const bytes = new Uint8Array(buf)
+
+  for (let i = 0; i < bytes.length; i += 65536) {
+    const slice = bytes.subarray(i, i + 65536)
     crypto.getRandomValues(slice)
   }
-}
-
-export function xorBuf(dst: Uint8Array, src: Uint8Array, len: number) {
-  for (let i = 0; i < len; i++) {
-    dst[i] ^= src[i]
-  }
-}
-
-export function getBlockByIndex(buf: Uint8Array<ArrayBuffer>, blockLen: number, index: number) {
-  const offset = index * blockLen
-  return buf.subarray(offset, offset + blockLen)
 }
 
 export async function readCache(url: string) {

@@ -1,0 +1,31 @@
+body, input, textarea {
+  font-family: monospace;
+  font-size: 14px;
+}
+input {
+  width: 10em;
+}
+input:invalid {
+  color: red;
+}
+.rows {
+  margin: 0.4em 0 0.2em 0;
+}
+#txtPlain, #txtCipher {
+  width: 100%;
+  height: 5em;
+}
+#txtCipher {
+  height: 12.7em;
+}
+#progressBar {
+  width: 100%;
+}
+#txtError {
+  height: 1em;
+  color: red;
+}
+.note {
+  color: #333;
+  font-size: 0.9em;
+}

@@ -23,14 +23,14 @@ export default {
     ],
   },
   resolve: {
-    extensions: ['.ts'],
+    extensions: ['.ts', '.js'],
   },
   experiments: {
     outputModule: true,
   },
   output: {
     filename: 'index.js',
-    path: import.meta.dirname + '/dist',
+    path: import.meta.dirname + '/public',
     library: {
       type: "module",
     },
