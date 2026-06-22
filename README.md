@@ -28,7 +28,7 @@ Single-threaded, CPU-only. The wait is the point.
 |             Device                  | Encrypt (GPU) | Decrypt (CPU)  | Ratio       |
 |-------------------------------------|---------------|----------------|-------------|
 | MacBook Pro M1 (3.2 GHz)            | ~65 GH/s      | ~100 MH/s      | **~600×**   |
-| GTX 1660 Ti / i5-9600K (4.6 GHz)    | ~190 GH/s     | ~140 MH/s      | **~1000×**  |
+| GTX 1660 Ti / i5-9600K (4.6 GHz)    | ~210 GH/s     | ~140 MH/s      | **~1500×**  |
 | RTX 5090 / i9-14900K (5.8 GHz)      | ~4 TH/s       | ~180 MH/s      | **~20000×** |
 
 > Example: 5s encrypt → ~1 day decrypt

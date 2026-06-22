@@ -8,6 +8,7 @@ import {
 } from './util'
 
 const WORKGROUP_SIZE = 64
+const ILP_FACTOR = 4
 
 const IS_MOBILE = /Mobi|Android/i.test(navigator.userAgent)
 const MAX_DISPATCH_MS = IS_MOBILE ? 200 : 1000
@@ -87,12 +88,14 @@ export async function start(params: EncryptParams) {
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
   })
 
+  const gpuThreadCount = thread / ILP_FACTOR
+
   const countBuffer = gpu.createBuffer({
-    size: thread * 4,
+    size: gpuThreadCount * 4,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
   })
   const countReadback = gpu.createBuffer({
-    size: thread * 4,
+    size: gpuThreadCount * 4,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
   })
 
@@ -122,7 +125,7 @@ export async function start(params: EncryptParams) {
     const pass = cmd.beginComputePass()
     pass.setPipeline(pipeline)
     pass.setBindGroup(0, bindGroup)
-    pass.dispatchWorkgroups(thread / WORKGROUP_SIZE)
+    pass.dispatchWorkgroups(gpuThreadCount / WORKGROUP_SIZE)
     pass.end()
     gpu.queue.submit([cmd.finish()])
 
@@ -135,11 +138,11 @@ export async function start(params: EncryptParams) {
 
     // detect GPU timeout: verify all threads completed expected dispatch count
     if (currentRate < lastRate * 0.3) {
-      const completed = await readDispatchCounts(gpu, countBuffer, countReadback, thread, dispatchCount)
-      if (completed < thread) {
+      const completed = await readDispatchCounts(gpu, countBuffer, countReadback, gpuThreadCount, dispatchCount)
+      if (completed < gpuThreadCount) {
         if (completed >= 0) {
-          const failedCount = thread - completed
-          console.warn(`GPU timeout: ${failedCount} threads incomplete at dispatch ${dispatchCount}`)
+          const failedCount = gpuThreadCount - completed
+          console.warn(`GPU timeout: ${failedCount} workgroups incomplete at dispatch ${dispatchCount}`)
         }
         break
       }
@@ -162,8 +165,8 @@ export async function start(params: EncryptParams) {
   }
 
   // verify all batches completed
-  const finalCompleted = await readDispatchCounts(gpu, countBuffer, countReadback, thread, dispatchCount)
-  if (finalCompleted < thread) {
+  const finalCompleted = await readDispatchCounts(gpu, countBuffer, countReadback, gpuThreadCount, dispatchCount)
+  if (finalCompleted < gpuThreadCount) {
     throw Error('GPU computation incomplete. Try reducing thread count.')
   }
 
